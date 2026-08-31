@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f5ef">
+<title>伙食费小账本</title>
+<style>
+:root{--bg:#f7f5ef;--card:#fff;--text:#242424;--muted:#888;--line:#ece9e1;--accent:#5d745f;--accent2:#e8eee6;--danger:#b85c52}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;color:var(--text)}
+.app{max-width:520px;margin:auto;min-height:100vh;padding-bottom:90px}.top{padding:28px 20px 12px}.date{font-size:13px;color:var(--muted)}h1{font-size:28px;margin:5px 0 18px}.total{background:var(--text);color:#fff;border-radius:22px;padding:22px}.total small{opacity:.7}.money{font-size:38px;font-weight:700;margin-top:4px}.split{display:flex;gap:8px;margin-top:18px}.pill{background:rgba(255,255,255,.1);padding:8px 11px;border-radius:12px;font-size:13px}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,100%);background:rgba(255,255,255,.95);backdrop-filter:blur(15px);display:flex;border-top:1px solid var(--line);padding:9px 6px calc(9px + env(safe-area-inset-bottom));z-index:5}nav button{flex:1;border:0;background:none;color:#999;font-size:12px;padding:5px}nav button.active{color:var(--accent);font-weight:700}nav b{display:block;font-size:20px;margin-bottom:2px}
+.page{display:none;padding:12px 20px}.page.active{display:block}.card{background:var(--card);border-radius:18px;padding:17px;margin:10px 0;border:1px solid var(--line)}.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.muted{color:var(--muted);font-size:13px}.section-title{font-size:18px;font-weight:700;margin:22px 0 8px}
+button.primary{background:var(--accent);color:white;border:0;border-radius:14px;padding:13px 17px;font-weight:700;width:100%;font-size:15px}.actions{display:flex;gap:8px}.actions button{flex:1}
+button.secondary{background:var(--accent2);color:var(--accent);border:0;border-radius:12px;padding:10px;font-weight:600}
+button.danger{background:#f8e9e7;color:var(--danger);border:0;border-radius:10px;padding:7px 10px}
+input,select{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;font-size:16px;outline:none}label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-end;z-index:10}.modal.show{display:flex}.sheet{background:var(--bg);width:100%;max-width:520px;margin:auto;border-radius:24px 24px 0 0;padding:20px;max-height:90vh;overflow:auto}.close{float:right;border:0;background:none;font-size:25px}
+.food{padding:13px 0;border-bottom:1px solid var(--line)}.food:last-child{border:0}.tag{font-size:12px;background:#f0eee8;border-radius:8px;padding:4px 7px;color:#777}
+.empty{text-align:center;color:#999;padding:35px 10px}.bigstat{font-size:27px;font-weight:700}.bar{height:8px;background:#eee;border-radius:99px;overflow:hidden;margin-top:9px}.bar i{display:block;height:100%;background:var(--accent)}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="date" id="today"></div>
+  <h1>伙食费小账本</h1>
+  <div class="total">
+    <small>今日伙食费</small>
+    <div class="money" id="todayTotal">¥0.00</div>
+    <div class="split"><span class="pill">外食 ¥<b id="todayOutside">0.00</b></span><span class="pill">自己做 ¥<b id="todayCook">0.00</b></span></div>
+  </div>
+</header>
+
+<section id="home" class="page active">
+  <div class="section-title">今天</div>
+  <div id="todayList"></div>
+  <div class="section-title">快速记一笔</div>
+  <div class="actions">
+    <button class="primary" onclick="openOutside()">🍜 外食</button>
+    <button class="primary" onclick="openCook()">🥬 做饭</button>
+  </div>
+  <div class="section-title">最近采购</div>
+  <div id="recentFood"></div>
+</section>
+
+<section id="inventory" class="page">
+  <div class="row"><div><h2>食材库存</h2><div class="muted">采购金额会随着使用比例自动减少</div></div></div>
+  <button class="primary" style="margin-top:12px" onclick="openBuy()">＋ 登记买菜</button>
+  <div id="inventoryList"></div>
+</section>
+
+<section id="records" class="page">
+  <h2>消费记录</h2>
+  <div id="recordsList"></div>
+</section>
+
+<section id="stats" class="page">
+  <h2>统计</h2>
+  <div class="card"><div class="muted">本月伙食费</div><div class="bigstat" id="monthTotal">¥0.00</div><div class="muted" id="monthAvg"></div></div>
+  <div class="card">
+    <div class="row"><span>外食</span><b id="monthOutside">¥0.00</b></div>
+    <div class="bar"><i id="outsideBar"></i></div>
+    <div class="row" style="margin-top:15px"><span>自己做饭</span><b id="monthCook">¥0.00</b></div>
+    <div class="bar"><i id="cookBar"></i></div>
+  </div>
+</section>
+
+<nav>
+<button class="active" onclick="showPage('home',this)"><b>⌂</b>首页</button>
+<button onclick="showPage('inventory',this)"><b>🥬</b>库存</button>
+<button onclick="showPage('records',this)"><b>☷</b>记录</button>
+<button onclick="showPage('stats',this)"><b>◔</b>统计</button>
+</nav>
+</div>
+
+<div class="modal" id="modal"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
+
+<script>
+const KEY='food_cost_v1';
+let db=JSON.parse(localStorage.getItem(KEY)||'{"foods":[],"meals":[],"outside":[]}');
+db.foods.forEach(f=>{if(f._origQty==null){f._origQty=f.qty||1;} if(f.remaining==null)f.remaining=(f.qty/f._origQty)*f.amount;});
+
+const save=()=>{localStorage.setItem(KEY,JSON.stringify(db));render()};
+const money=n=>'¥'+Number(n||0).toFixed(2);
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtDate=d=>new Date(d+'T00:00:00').toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'});
+document.getElementById('today').textContent=fmtDate(today());
+
+function showPage(id,btn){document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));btn.classList.add('active');render()}
+function modal(html){document.getElementById('modalContent').innerHTML=html;document.getElementById('modal').classList.add('show')}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+
+function openOutside(){
+modal(`<h2>记录外食</h2>
+<label>日期</label><input id="oDate" type="date" value="${today()}">
+<label>餐次</label><select id="oMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
+<label>金额</label><input id="oAmount" type="number" step="0.01" placeholder="例如 35">
+<label>备注</label><input id="oNote" placeholder="例如 拉面">
+<button class="primary" style="margin-top:18px" onclick="addOutside()">保存</button>`)
+}
+function addOutside(){let a=+document.getElementById('oAmount').value;if(!a)return;db.outside.push({id:Date.now(),date:document.getElementById('oDate').value,meal:document.getElementById('oMeal').value,amount:a,note:document.getElementById('oNote').value});closeModal();save()}
+
+function openBuy(){
+modal(`<h2>登记采购</h2>
+<label>日期</label><input id="bDate" type="date" value="${today()}">
+<label>食材</label><input id="bName" placeholder="例如 鸡胸肉">
+<label>购买金额</label><input id="bAmount" type="number" step="0.01" placeholder="例如 25">
+<label>计量方式</label><select id="bUnit"><option value="g">克（g）</option><option value="ml">毫升（ml）</option><option value="count">个</option><option value="portion">份/盒/袋</option></select>
+<label>购买总量</label><input id="bQty" type="number" step="0.01" placeholder="例如 500">
+<button class="primary" style="margin-top:18px" onclick="addFood()">加入库存</button>`)
+}
+function addFood(){let n=document.getElementById('bName').value.trim(),a=+document.getElementById('bAmount').value,q=+document.getElementById('bQty').value,u=document.getElementById('bUnit').value;if(!n||!a||!q)return;db.foods.push({id:Date.now(),date:document.getElementById('bDate').value,name:n,amount:a,remaining:a,qty:q,_origQty:q,unit:u});closeModal();save()}
+
+function openCook(){
+let usable=db.foods.filter(f=>f.remaining>0.001);
+if(!usable.length){alert('还没有可用库存，请先登记买菜。');return}
+modal(`<h2>记录做饭</h2>
+<label>日期</label><input id="cDate" type="date" value="${today()}">
+<label>餐次</label><select id="cMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
+<div id="cookRows"></div>
+<button class="secondary" style="margin-top:10px" onclick="addCookRow()">＋ 添加食材</button>
+<div id="cookTotal" style="font-weight:700;font-size:22px;margin:18px 0">本餐 ¥0.00</div>
+<button class="primary" onclick="saveCook()">保存本餐</button>`)
+addCookRow();
+}
+function unitText(u){return {g:'g',ml:'ml',count:'个',portion:'份'}[u]||u}
+function foodLabel(f){return `${f.name}（批次${f.date} · 剩余 ${f.qty}${unitText(f.unit)} / ${money(f.remaining)}）`}
+function addCookRow(){
+let wrap=document.getElementById('cookRows');
+let div=document.createElement('div');div.className='food';
+let groups=[...new Map(db.foods.filter(f=>f.remaining>0.001).map(f=>[f.name,f.name])).values()];
+div.innerHTML=`<select class="foodName" onchange="updateCook()">${groups.map(n=>`<option>${n}</option>`).join('')}</select>
+<div style="display:flex;gap:7px;margin-top:7px">
+<select class="useMode" onchange="toggleUseInput(this);updateCook()">
+<option value="qty">精准数量</option><option value="half">1/2</option><option value="third">1/3</option><option value="quarter">1/4</option><option value="remain">剩余</option>
+</select>
+<input class="useQty" type="number" step="0.01" placeholder="数量" oninput="updateCook()">
+<button class="danger" onclick="this.parentElement.parentElement.remove();updateCook()">删除</button>
+</div>`;
+wrap.appendChild(div);toggleUseInput(div.querySelector('.useMode'));updateCook();
+}
+function toggleUseInput(sel){sel.parentElement.querySelector('.useQty').style.display=sel.value==='qty'?'block':'none'}
+function fifoPreview(name, qty, mode){
+let batches=db.foods.filter(f=>f.name===name&&f.remaining>0.001).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+let need=qty, cost=0;
+if(mode!=='qty'){let totalQty=batches.reduce((s,f)=>s+f.qty,0); if(mode==='remain') need=totalQty; else need=totalQty*({half:.5,third:1/3,quarter:.25}[mode]||1)}
+for(let f of batches){let avail=f.qty, take=Math.min(avail,need);cost+=take/f.qty*f.amount;need-=take;if(need<=1e-9)break}
+return {cost,need};
+}
+function updateCook(){
+let total=0;
+document.querySelectorAll('#cookRows .food').forEach(r=>{
+let name=r.querySelector('.foodName').value,mode=r.querySelector('.useMode').value;
+let qty=mode==='qty'?(+r.querySelector('.useQty').value||0):0;
+total+=fifoPreview(name,qty,mode).cost;
+});
+document.getElementById('cookTotal').textContent='本餐 '+money(total)
+}
+function saveCook(){
+let date=document.getElementById('cDate').value,meal=document.getElementById('cMeal').value,items=[],total=0;
+let rows=[...document.querySelectorAll('#cookRows .food')];
+for(let r of rows){
+let name=r.querySelector('.foodName').value,mode=r.querySelector('.useMode').value;
+let batches=db.foods.filter(f=>f.name===name&&f.remaining>0.001).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+let totalQty=batches.reduce((s,f)=>s+f.qty,0);
+let need=mode==='qty'?(+r.querySelector('.useQty').value||0):mode==='remain'?totalQty:totalQty*({half:.5,third:1/3,quarter:.25}[mode]||1);
+if(need<=0)continue;
+let preview=fifoPreview(name,need,'qty'); if(preview.need>1e-8){alert(`${name} 库存不足，请检查数量。`);return}
+for(let f of batches){
+if(need<=1e-9)break;
+let take=Math.min(f.qty,need),cost=take/f.qty*f.amount;
+f.qty-=take;f.remaining=f.qty/f._origQty*f.amount;
+if(!f._origQty) { /* handled below */ }
+items.push({foodId:f.id,name:f.name,qty:take,unit:f.unit,cost,ratio:mode,batchDate:f.date});
+total+=cost;need-=take;
+}
+}
+if(!items.length)return;db.meals.push({id:Date.now(),date,meal,total,items});closeModal();save()
+}
+function delOutside(id){db.outside=db.outside.filter(x=>x.id!==id);save()}
+function delMeal(id){let m=db.meals.find(x=>x.id===id);if(m){m.items.forEach(it=>{let f=db.foods.find(x=>x.id===it.foodId);if(f){f.qty+=it.qty;f.remaining=(f.qty/f._origQty)*f.amount}});db.meals=db.meals.filter(x=>x.id!==id);save()}}
+function delFood(id){if(confirm('删除这个食材？已记录的做饭账目不会自动删除。')){db.foods=db.foods.filter(x=>x.id!==id);save()}}
+
+function render(){
+let d=today(),outs=db.outside.filter(x=>x.date===d),meals=db.meals.filter(x=>x.date===d);
+let oc=outs.reduce((s,x)=>s+x.amount,0),mc=meals.reduce((s,x)=>s+x.total,0);
+document.getElementById('todayTotal').textContent=money(oc+mc).replace('¥','¥');
+document.getElementById('todayOutside').textContent=oc.toFixed(2);document.getElementById('todayCook').textContent=mc.toFixed(2);
+let list=[...outs.map(x=>({t:x.meal,n:x.note||'外食',a:x.amount,del:`delOutside(${x.id})`})),...meals.map(x=>({t:x.meal,n:x.items.map(i=>i.name).join('、'),a:x.total,del:`delMeal(${x.id})`}))];
+document.getElementById('todayList').innerHTML=list.length?list.map(x=>`<div class="card"><div class="row"><div><b>${x.t}</b><div class="muted">${x.n}</div></div><div><b>${money(x.a)}</b> <button class="danger" onclick="${x.del}">×</button></div></div></div>`).join(''):'<div class="empty">今天还没有伙食费记录</div>';
+let inv=db.foods.filter(f=>f.remaining>0.001).slice().reverse();
+document.getElementById('recentFood').innerHTML=inv.slice(0,4).map(f=>`<div class="card"><div class="row"><div><b>${f.name}</b><div class="muted">${f.qty||0}${unitText(f.unit)} · ${f.date}</div></div><div><b>${money(f.remaining)}</b><div class="muted">剩余价值</div></div></div></div>`).join('')||'<div class="empty">还没有采购记录</div>';
+document.getElementById('inventoryList').innerHTML=inv.length?inv.map(f=>`<div class="card"><div class="row"><div><b>${f.name}</b><div class="muted">购于 ${f.date} · 原价 ${money(f.amount)}</div><div class="muted">${f.qty||0}${unitText(f.unit)}</div></div><div style="text-align:right"><b>${money(f.remaining)}</b><br><button class="danger" style="margin-top:6px" onclick="delFood(${f.id})">删除</button></div></div></div>`).join(''):'<div class="empty">库存为空</div>';
+let all=[...db.outside.map(x=>({date:x.date,type:'外食',meal:x.meal,note:x.note||'外食',amount:x.amount})),...db.meals.map(x=>({date:x.date,type:'做饭',meal:x.meal,note:x.items.map(i=>i.name).join('、'),amount:x.total}))].sort((a,b)=>b.date.localeCompare(a.date));
+document.getElementById('recordsList').innerHTML=all.length?all.map(x=>`<div class="card"><div class="row"><div><span class="tag">${x.type}</span> <b>${x.meal}</b><div class="muted">${x.date} · ${x.note}</div></div><b>${money(x.amount)}</b></div></div>`).join(''):'<div class="empty">暂无记录</div>';
+let ym=d.slice(0,7),mo=db.outside.filter(x=>x.date.startsWith(ym)).reduce((s,x)=>s+x.amount,0),mm=db.meals.filter(x=>x.date.startsWith(ym)).reduce((s,x)=>s+x.total,0),mt=mo+mm;
+document.getElementById('monthTotal').textContent=money(mt);document.getElementById('monthOutside').textContent=money(mo);document.getElementById('monthCook').textContent=money(mm);document.getElementById('outsideBar').style.width=mt?mo/mt*100+'%':'0%';document.getElementById('cookBar').style.width=mt?mm/mt*100+'%':'0%';
+let days=new Set([...db.outside,...db.meals].filter(x=>x.date.startsWith(ym)).map(x=>x.date)).size;document.getElementById('monthAvg').textContent=days?`有记录的 ${days} 天，平均 ${money(mt/days)}/天`:'本月还没有记录';
+}
+render();
+</script>
+</body>
+</html>
