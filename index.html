@@ -652,7 +652,7 @@ function normalizeFoodName(raw){
 const save=async()=>{
   try{
     localStorage.setItem(KEY, JSON.stringify(db));
-    await saveToRepo(db);
+    await saveToSupabase(db);
     render();
   }catch(e){ toast('保存失败：'+e.message); }
 };
