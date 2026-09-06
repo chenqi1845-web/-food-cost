@@ -177,6 +177,7 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
   <div class="actions" style="margin-top:8px">
     <button class="secondary" onclick="openVoiceBuy()">🎤 语音录入</button>
     <button class="secondary" onclick="openOCRBuy()">📷 拍照/小票</button>
+    <button class="secondary" onclick="showSyncModal()" style="background:var(--accent);color:white;border:none">☁️ 云同步</button>
   </div>
 
   <!-- 数据可视化卡片 -->
@@ -258,11 +259,13 @@ async function loadFromGist(){
 }
 
 async function saveGistToken(){
-  const token=document.getElementById('gistTokenInput').value.trim();
+  const token = document.getElementById('modalGistToken')?.value.trim()
+              || document.getElementById('gistTokenInput')?.value.trim();
   if(!token){ toast('请先粘贴 Token'); return; }
   localStorage.setItem('food_cost_gist_token', token);
-  localStorage.removeItem(GIST_KEY); // 清除旧的 gist id，重新创建
-  document.getElementById('gistTokenInput').value='';
+  localStorage.removeItem(GIST_KEY);
+  if(document.getElementById('modalGistToken')) document.getElementById('modalGistToken').value='';
+  if(document.getElementById('gistTokenInput')) document.getElementById('gistTokenInput').value='';
   toast('同步中…');
   try{
     db = await syncWithGist();
@@ -689,6 +692,24 @@ function toast(msg, ms=1800){
   el.textContent=msg; el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>el.classList.remove('show'), ms);
+}
+
+function showSyncModal(){
+  const token=localStorage.getItem('food_cost_gist_token');
+  const gistId=localStorage.getItem(GIST_KEY);
+  const status=gistId?'已连接 ☁️':'未连接';
+  const area=token?`<div class="muted" style="padding:12px;background:var(--card);border-radius:8px;text-align:center">
+    <div style="font-size:24px;margin-bottom:8px">${gistId?'✅':'⚠️'}</div>
+    <div>${status}</div>
+    ${gistId?`<div class="muted" style="margin-top:8px">设备：电脑/手机均打开此页面即可自动同步</div>`:''}
+    <button onclick="localStorage.removeItem('food_cost_gist_token');localStorage.removeItem(GIST_KEY);showSyncModal();toast('已断开')" style="margin-top:12px;padding:6px 16px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer">断开同步</button>
+  </div>`:`<div style="padding:12px">
+    <div class="muted" style="margin-bottom:12px">首次使用请粘贴 GitHub Token：</div>
+    <input id="modalGistToken" type="password" placeholder="ghp_xxxxxxxxxxxx" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;background:var(--card)">
+    <button onclick="document.getElementById('gistTokenInput').value=document.getElementById('modalGistToken').value;saveGistToken();closeModal()" style="margin-top:10px;width:100%;padding:8px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">保存并同步</button>
+    <div class="muted" style="font-size:12px;margin-top:8px;text-align:center">Token 仅本地存储，不会上传至任何第三方</div>
+  </div>`;
+  modal(`<h3>☁️ 云同步</h3>${area}<div style="text-align:center;margin-top:12px"><button class="ghost" onclick="closeModal()">关闭</button></div>`);
 }
 
 /* ============================================================
