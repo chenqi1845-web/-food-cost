@@ -258,11 +258,14 @@ async function saveToRepo(data){
   if(!token) return;
   const sha=localStorage.getItem(DATA_KEY)||'';
   const content=btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  // token 放 URL 参数避免 CORS preflight
+  const url=`https://api.github.com/repos/${REPO}/contents/food-cost-data.json?access_token=${encodeURIComponent(token)}`;
   const payload={message:'update food-cost data',content};
   if(sha) payload.sha=sha;
   try{
-    const r=await fetch(`https://api.github.com/repos/${REPO}/contents/food-cost-data.json`,{
-      method:'PUT',headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
+    const r=await fetch(url,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},
       body:JSON.stringify(payload)
     });
     const res=await r.json();
@@ -278,8 +281,15 @@ async function syncData(){
   let currentSha=localStorage.getItem(DATA_KEY)||'';
   if(token && !currentSha){
     try{
+      const r=await fetch(`https://api.github.com/repos/${REPO}/contents/food-cost-data.json?access_token=${encodeURIComponent(token)}`,{
+        headers:{'Accept':'application/vnd.github.v3+json'}
+      });
+      if(r.ok){const d=await r.json();currentSha=d.sha;localStorage.setItem(DATA_KEY,currentSha);}
+    }catch(e){}
+  } else if(!token && !currentSha){
+    try{
       const r=await fetch(`https://api.github.com/repos/${REPO}/contents/food-cost-data.json`,{
-        headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+        headers:{'Accept':'application/vnd.github.v3+json'}
       });
       if(r.ok){const d=await r.json();currentSha=d.sha;localStorage.setItem(DATA_KEY,currentSha);}
     }catch(e){}
