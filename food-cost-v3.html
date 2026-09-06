@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f5ef">
+<title>伙食费小账本</title>
+<style>
+:root{
+  --bg:#f7f5ef; --card:#fff; --text:#242424; --muted:#888;
+  --line:#ece9e1; --accent:#5d745f; --accent2:#e8eee6; --danger:#b85c52;
+  --warn:#c98a1d; --warn-bg:#fdf3df;
+  --urgent:#b85c52; --urgent-bg:#fbe9e6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;color:var(--text)}
+.app{max-width:520px;margin:auto;min-height:100vh;padding-bottom:90px}
+.top{padding:28px 20px 12px}
+.date{font-size:13px;color:var(--muted)}
+h1{font-size:28px;margin:5px 0 18px}
+h2{font-size:20px;margin:18px 0 8px}
+.total{background:var(--text);color:#fff;border-radius:22px;padding:22px}
+.total small{opacity:.7}
+.money{font-size:38px;font-weight:700;margin-top:4px}
+.split{display:flex;gap:8px;margin-top:18px}
+.pill{background:rgba(255,255,255,.1);padding:8px 11px;border-radius:12px;font-size:13px}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,100%);background:rgba(255,255,255,.95);backdrop-filter:blur(15px);display:flex;border-top:1px solid var(--line);padding:9px 6px calc(9px + env(safe-area-inset-bottom));z-index:5}
+nav button{flex:1;border:0;background:none;color:#999;font-size:12px;padding:5px}
+nav button.active{color:var(--accent);font-weight:700}
+nav b{display:block;font-size:20px;margin-bottom:2px}
+.page{display:none;padding:12px 20px}
+.page.active{display:block}
+.card{background:var(--card);border-radius:18px;padding:17px;margin:10px 0;border:1px solid var(--line)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.muted{color:var(--muted);font-size:13px}
+.section-title{font-size:18px;font-weight:700;margin:22px 0 8px}
+button.primary{background:var(--accent);color:white;border:0;border-radius:14px;padding:13px 17px;font-weight:700;width:100%;font-size:15px}
+.actions{display:flex;gap:8px}
+.actions button{flex:1}
+button.secondary{background:var(--accent2);color:var(--accent);border:0;border-radius:12px;padding:10px;font-weight:600}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:10px;padding:7px 10px;font-weight:600}
+button.danger{background:#f8e9e7;color:var(--danger);border:0;border-radius:10px;padding:7px 10px}
+input,select{width:100%;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;font-size:16px;outline:none}
+label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:flex-end;z-index:10}
+.modal.show{display:flex}
+.sheet{background:var(--bg);width:100%;max-width:520px;margin:auto;border-radius:24px 24px 0 0;padding:20px;max-height:90vh;overflow:auto}
+.close{float:right;border:0;background:none;font-size:25px}
+.food{padding:13px 0;border-bottom:1px solid var(--line)}
+.food:last-child{border:0}
+.tag{font-size:12px;background:#f0eee8;border-radius:8px;padding:4px 7px;color:#777}
+.empty{text-align:center;color:#999;padding:35px 10px}
+.bigstat{font-size:27px;font-weight:700}
+.bar{height:8px;background:#eee;border-radius:99px;overflow:hidden;margin-top:9px}
+.bar i{display:block;height:100%;background:var(--accent)}
+/* 重复食材提醒 */
+.dup-warn{background:var(--warn-bg);border:1px solid #ecd9a8;border-radius:12px;padding:10px 12px;margin-top:8px;font-size:13px;color:#7a5a13}
+.dup-warn b{color:var(--warn)}
+.dup-warn .row{margin-top:6px;gap:6px}
+.dup-warn button{font-size:12px;padding:6px 9px}
+.similar-row{background:#fbf7ee;border-left:3px solid var(--warn);padding-left:10px;border-radius:6px}
+/* 周统计 */
+.week-head{display:flex;justify-content:space-between;align-items:center;margin:18px 0 6px}
+.week-head h3{margin:0;font-size:16px}
+.week-arrow{background:none;border:1px solid var(--line);border-radius:10px;padding:4px 10px;font-size:13px;color:var(--text)}
+.day-row{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.day-row:last-child{border:0}
+.day-row .row b{font-size:16px}
+.day-detail{max-height:0;overflow:hidden;transition:max-height .25s ease;font-size:13px;color:#555}
+.day-detail.open{max-height:600px}
+.day-detail .item{display:flex;justify-content:space-between;padding:4px 0}
+/* Toast */
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#333;color:#fff;padding:11px 16px;border-radius:12px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+/* 编辑按钮 */
+.edit-row{display:flex;gap:6px;align-items:center}
+
+/* 提醒区 */
+.alert-bar{background:var(--warn-bg);border:1px solid #ecd9a8;border-radius:14px;padding:11px 14px;margin:0 0 10px;font-size:13px;color:#7a5a13;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.alert-bar.urgent{background:var(--urgent-bg);border-color:#ecc7c1;color:#7a2e25}
+.alert-bar b{color:var(--warn)}
+.alert-bar.urgent b{color:var(--urgent)}
+.alert-bar button{background:rgba(255,255,255,.6);border:1px solid currentColor;border-radius:8px;padding:4px 10px;font-size:12px;color:inherit;cursor:pointer}
+
+/* 库存高亮（即将过期/已过期） */
+.expire-soon{background:var(--warn-bg);border-left:3px solid var(--warn);padding-left:10px;border-radius:6px}
+.expired{background:var(--urgent-bg);border-left:3px solid var(--urgent);padding-left:10px;border-radius:6px}
+
+/* 语音录入 */
+.voice-mic{display:flex;align-items:center;gap:10px;background:var(--accent2);border-radius:12px;padding:14px;margin-top:12px;cursor:pointer}
+.voice-mic .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);flex:none;transition:transform .2s, background .2s}
+.voice-mic.live .dot{background:var(--danger);animation:pulse 1s infinite}
+.voice-mic .hint{color:var(--accent);font-weight:600;font-size:14px}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.4)}}
+.voice-result{background:#fff;border:1px dashed var(--accent);border-radius:12px;padding:12px;margin-top:8px;font-size:15px;min-height:50px}
+.voice-result .alt{background:#f6f6f0;border-radius:6px;padding:6px 8px;margin-top:6px;cursor:pointer;font-size:13px;color:#666}
+
+/* OCR */
+.ocr-zone{border:2px dashed var(--line);border-radius:14px;padding:24px;text-align:center;color:var(--muted);cursor:pointer;margin-top:12px}
+.ocr-zone:hover{border-color:var(--accent);color:var(--accent)}
+.ocr-zone img{max-width:100%;max-height:240px;border-radius:8px;margin-top:10px}
+.ocr-progress{margin-top:10px;font-size:13px;color:var(--accent)}
+.ocr-list{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:10px;max-height:280px;overflow:auto}
+.ocr-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f3f1ea}
+.ocr-row:last-child{border:0}
+.ocr-row input[type=text],.ocr-row input[type=number]{padding:6px 8px;font-size:13px}
+.ocr-row .col-name{flex:2;min-width:0}
+.ocr-row .col-price{flex:1;min-width:0}
+.ocr-row .col-qty{flex:1;min-width:0}
+.ocr-row .col-unit{flex:1;min-width:0;font-size:12px;padding:6px 4px}
+.ocr-row .col-del{background:none;border:0;color:var(--danger);font-size:18px;cursor:pointer;flex:none}
+.ocr-name-original{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 食材保质期标签 */
+.shelf-pill{font-size:11px;border-radius:6px;padding:2px 6px;margin-left:6px;background:#eef4ee;color:var(--accent)}
+.shelf-pill.fridge{background:#e3eef7;color:#2a6090}
+.shelf-pill.frozen{background:#e7f0fa;color:#3978b5}
+.shelf-pill.room{background:#faeee5;color:#a86840}
+
+.storage-tabs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.storage-tabs button{font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:#777;cursor:pointer}
+.storage-tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* 数据可视化 */
+.viz-card{background:var(--card);border-radius:18px;padding:14px 16px;margin-top:10px;border:1px solid var(--line)}
+.viz-title{font-size:14px;font-weight:700;margin-bottom:10px;color:var(--text)}
+.viz-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px}
+.viz-bar-wrap{flex:1;margin:0 8px;height:6px;background:#eee;border-radius:99px;overflow:hidden;min-width:60px}
+.viz-bar{height:100%;border-radius:99px;transition:width .3s}
+.viz-swatch{width:10px;height:10px;border-radius:3px;flex:none;margin-right:6px}
+.viz-total{font-size:13px;color:var(--muted);margin-bottom:6px}
+.viz-pie{width:120px;height:120px;display:block;margin:0 auto}
+.viz-pie-center{text-anchor:middle;font-weight:700;font-size:13px;fill:var(--text)}
+.viz-pie-sub{text-anchor:middle;font-size:10px;fill:var(--muted)}
+.viz-legend{margin-top:8px;font-size:12px}
+.viz-legend-item{display:flex;align-items:center;padding:3px 0;color:#555}
+.viz-timeline{position:relative;padding:10px 0}
+.viz-timeline-bar{display:flex;height:24px;border-radius:6px;overflow:hidden;background:#f5f3ed;margin:8px 0}
+.viz-timeline-seg{position:relative;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:600;min-width:0;transition:flex .3s}
+.viz-timeline-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:0 2px}
+.viz-priority-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #f3f1ea;gap:8px}
+.viz-priority-row:last-child{border:0}
+.viz-priority-name{flex:1;font-weight:600}
+.viz-priority-meta{font-size:11px;color:var(--muted)}
+.viz-cat-group{margin-top:14px}
+.viz-cat-group-title{font-size:13px;font-weight:700;color:var(--muted);padding:4px 0;margin-bottom:4px;border-bottom:1px dashed var(--line)}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+  <div class="date" id="today"></div>
+  <h1>伙食费小账本</h1>
+  <div id="alertBar"></div>
+  <div class="total">
+    <small>今日伙食费</small>
+    <div class="money" id="todayTotal">¥0.00</div>
+    <div class="split"><span class="pill">外食 ¥<b id="todayOutside">0.00</b></span><span class="pill">自己做 ¥<b id="todayCook">0.00</b></span></div>
+  </div>
+</header>
+
+<section id="home" class="page active">
+  <div class="section-title">今天</div>
+  <div id="todayList"></div>
+  <div class="section-title">快速记一笔</div>
+  <div class="actions">
+    <button class="primary" onclick="openOutside()">🍜 外食</button>
+    <button class="primary" onclick="openCook()">🥬 做饭</button>
+  </div>
+  <div class="section-title">即将过期（优先消耗）</div>
+  <div id="recentFood"></div>
+</section>
+
+<section id="inventory" class="page">
+  <div class="row"><div><h2>食材库存</h2><div class="muted">采购金额会随着使用比例自动减少</div></div></div>
+  <button class="primary" style="margin-top:12px" onclick="openBuy()">＋ 登记买菜</button>
+  <div class="actions" style="margin-top:8px">
+    <button class="secondary" onclick="openVoiceBuy()">🎤 语音录入</button>
+    <button class="secondary" onclick="openOCRBuy()">📷 拍照/小票</button>
+  </div>
+
+  <!-- 数据可视化卡片 -->
+  <div id="inventoryStats"></div>
+
+  <!-- 视图切换 -->
+  <div class="storage-tabs" id="viewTabs" style="margin-top:16px">
+    <button data-view="expire" class="active">⏳ 按过期时间</button>
+    <button data-view="category">📦 按分类</button>
+  </div>
+  <div id="inventoryList"></div>
+</section>
+
+<section id="records" class="page">
+  <h2>消费记录</h2>
+  <div id="recordsList"></div>
+</section>
+
+<section id="stats" class="page">
+  <h2>统计</h2>
+  <div class="card"><div class="muted">本月伙食费</div><div class="bigstat" id="monthTotal">¥0.00</div><div class="muted" id="monthAvg"></div></div>
+  <div class="card">
+    <div class="row"><span>外食</span><b id="monthOutside">¥0.00</b></div>
+    <div class="bar"><i id="outsideBar"></i></div>
+    <div class="row" style="margin-top:15px"><span>自己做饭</span><b id="monthCook">¥0.00</b></div>
+    <div class="bar"><i id="cookBar"></i></div>
+  </div>
+  <div id="syncStatus" style="display:none" class="card">
+    <div class="row"><span>☁️ 云同步</span><span id="syncInfo" class="muted"></span></div>
+    <div id="syncTokenArea" style="margin-top:8px">
+      <input id="gistTokenInput" type="password" placeholder="粘贴 GitHub Token" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--card)">
+      <button onclick="saveGistToken()" style="margin-top:6px;width:100%;padding:6px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">保存并同步</button>
+      <div class="muted" style="font-size:12px;margin-top:4px">Token 仅本地存储，不会上传到任何第三方</div>
+    </div>
+  </div>
+  <div class="week-head">
+    <button class="week-arrow" onclick="shiftWeek(-1)">‹ 上一周</button>
+    <h3 id="weekRange">本周</h3>
+    <button class="week-arrow" onclick="shiftWeek(1)">下一周 ›</button>
+  </div>
+  <div class="card" id="weekCard"></div>
+</section>
+
+<nav>
+<button class="active" onclick="showPage('home',this)"><b>⌂</b>首页</button>
+<button onclick="showPage('inventory',this)"><b>🥬</b>库存</button>
+<button onclick="showPage('records',this)"><b>☷</b>记录</button>
+<button onclick="showPage('stats',this)"><b>◔</b>统计</button>
+</nav>
+</div>
+
+<div class="modal" id="modal"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   数据层 + 迁移 v2 → v3
+   ============================================================ */
+const KEY='food_cost_v3';
+const GIST_KEY='food_cost_gist_id';
+const SCHEMA=3;
+
+async function loadFromGist(){
+  const gistId=localStorage.getItem(GIST_KEY);
+  if(!gistId) return null;
+  try{
+    const r=await fetch(`https://api.github.com/gists/${gistId}`,{
+      headers:{'Authorization':'token '+localStorage.getItem('food_cost_gist_token'),
+               'Accept':'application/vnd.github.v3+json'}
+    });
+    if(!r.ok) return null;
+    const d=await r.json();
+    const f=d.files&&d.files['food-cost-data.json'];
+    if(!f||!f.content) return null;
+    return {data:JSON.parse(f.content), updatedAt:new Date(d.updated_at)};
+  }catch(e){return null;}
+}
+
+async function saveGistToken(){
+  const token=document.getElementById('gistTokenInput').value.trim();
+  if(!token){ toast('请先粘贴 Token'); return; }
+  localStorage.setItem('food_cost_gist_token', token);
+  localStorage.removeItem(GIST_KEY); // 清除旧的 gist id，重新创建
+  document.getElementById('gistTokenInput').value='';
+  toast('同步中…');
+  try{
+    db = await syncWithGist();
+    db.foods.forEach(f=>{
+      if(f._origQty==null) f._origQty=f.qty||1;
+      if(f.unitPrice==null) f.unitPrice=f._origQty>0?f.amount/f._origQty:f.amount;
+      if(f.remaining==null) f.remaining=f.qty*f.unitPrice;
+      if(!f.batchKey) f.batchKey=f.name+'|'+f.date;
+      if(!f.unit) f.unit='portion';
+      if(!f.storage) f.storage='fridge';
+      if(f.shelfLifeDays==null) f.shelfLifeDays=7;
+      if(!f.expiresAt){const exp=new Date(f.date+'T00:00:00');exp.setDate(exp.getDate()+f.shelfLifeDays);f.expiresAt=exp.toISOString().slice(0,10);}
+      if(f.lowStockThreshold==null) f.lowStockThreshold=Math.max(1,Math.round((f._origQty||1)*0.2));
+    });
+    showSyncStatus();
+    render();
+    toast('同步完成');
+  }catch(e){ toast('同步失败：'+e.message); }
+}
+
+function showSyncStatus(){
+  const el=document.getElementById('syncStatus');
+  const info=document.getElementById('syncInfo');
+  const tokenArea=document.getElementById('syncTokenArea');
+  if(!el) return;
+  el.style.display='block';
+  const token=localStorage.getItem('food_cost_gist_token');
+  const gistId=localStorage.getItem(GIST_KEY);
+  if(token){
+    info.textContent=gistId?'已连接 ☁️':'未连接';
+    tokenArea.style.display='none';
+  }else{
+    info.textContent='未连接';
+    tokenArea.style.display='block';
+  }
+}
+async function saveToGist(data){
+  const token=localStorage.getItem('food_cost_gist_token');
+  if(!token) return;
+  const gistId=localStorage.getItem(GIST_KEY);
+  const payload={description:'伙食费小账本数据',public:false,
+    files:{'food-cost-data.json':{content:JSON.stringify(data)}}};
+  try{
+    if(gistId){
+      await fetch(`https://api.github.com/gists/${gistId}`,{
+        method:'PATCH',
+        headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+    }else{
+      const r=await fetch('https://api.github.com/gists',{
+        method:'POST',
+        headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      });
+      const res=await r.json();
+      if(res.id){localStorage.setItem(GIST_KEY,res.id);}
+    }
+  }catch(e){console.warn('Gist保存失败',e);}
+}
+
+async function syncWithGist(){
+  const gistData=await loadFromGist();
+  const localData=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(!gistData){
+    if(localData) await saveToGist(localData);
+    return localData||{_schema:SCHEMA,foods:[],meals:[],outside:[],reminders:[]};
+  }
+  if(!localData){
+    localStorage.setItem(KEY,JSON.stringify(gistData.data));
+    return gistData.data;
+  }
+  // 以最新记录的 date 为准比较
+  const maxTs=a=>a.length?a.map(x=>x.date+'|'+String(x.id||0)).sort().at(-1):'';
+  const localTs=[maxTs(localData.foods),maxTs(localData.meals),maxTs(localData.outside)].sort().at(-1);
+  const gistTs=[maxTs(gistData.data.foods),maxTs(gistData.data.meals),maxTs(gistData.data.outside)].sort().at(-1);
+  if(gistTs>=localTs){
+    localStorage.setItem(KEY,JSON.stringify(gistData.data));
+    return gistData.data;
+  }else{
+    await saveToGist(localData);
+    return localData;
+  }
+}
+
+function loadDB(){
+  let raw;
+  try{ raw=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ raw=null; }
+  if(raw && raw._schema===SCHEMA) return raw;
+
+  // 尝试迁移 v2 → v3
+  let prev=null;
+  try{ prev=JSON.parse(localStorage.getItem('food_cost_v2')||'null'); }catch(e){ prev=null; }
+  if(!prev){
+    try{ prev=JSON.parse(localStorage.getItem('food_cost_v1')||'null'); }catch(e){ prev=null; }
+  }
+
+  if(!prev){ return {_schema:SCHEMA, foods:[], meals:[], outside:[], reminders:[]}; }
+
+  // 升级 foods：补 shelfLife / storage / expiresAt / batchKey / unitPrice
+  prev.foods.forEach(f=>{
+    if(f._origQty==null) f._origQty=f.qty||1;
+    if(f.unitPrice==null) f.unitPrice = f._origQty>0 ? f.amount/f._origQty : f.amount;
+    if(f.remaining==null) f.remaining = f.qty * f.unitPrice;
+    if(!f.batchKey) f.batchKey=f.name+'|'+f.date;
+    if(!f.unit) f.unit='portion';
+    if(!f.storage) f.storage='fridge';
+    if(f.shelfLifeDays==null) f.shelfLifeDays=SHELF_DB[normalize(f.name)]?.days || 7;
+    if(!f.expiresAt){
+      // 默认 7 天后过期
+      const exp=new Date(f.date+'T00:00:00'); exp.setDate(exp.getDate()+(f.shelfLifeDays||7));
+      f.expiresAt=exp.toISOString().slice(0,10);
+    }
+    if(f.lowStockThreshold==null) f.lowStockThreshold=Math.max(1, Math.round((f._origQty||1)*0.2));
+  });
+
+  prev._schema=SCHEMA;
+  prev.reminders = prev.reminders || [];
+  localStorage.setItem(KEY, JSON.stringify(prev));
+  return prev;
+}
+
+// 启动（异步：先同步 Gist 再渲染）
+(async()=>{
+  try{
+    db = await syncWithGist();
+    db.foods.forEach(f=>{
+      if(f._origQty==null) f._origQty=f.qty||1;
+      if(f.unitPrice==null) f.unitPrice=f._origQty>0?f.amount/f._origQty:f.amount;
+      if(f.remaining==null) f.remaining=f.qty*f.unitPrice;
+      if(!f.batchKey) f.batchKey=f.name+'|'+f.date;
+      if(!f.unit) f.unit='portion';
+      if(!f.storage) f.storage='fridge';
+      if(f.shelfLifeDays==null) f.shelfLifeDays=7;
+      if(!f.expiresAt){const exp=new Date(f.date+'T00:00:00');exp.setDate(exp.getDate()+f.shelfLifeDays);f.expiresAt=exp.toISOString().slice(0,10);}
+      if(f.lowStockThreshold==null) f.lowStockThreshold=Math.max(1,Math.round((f._origQty||1)*0.2));
+    });
+  }catch(e){console.warn('Gist同步失败，用本地数据',e);}
+  render();
+  showSyncStatus();
+  ensureNotifPermission();
+  setInterval(runNotifCheck, 60000);
+})();
+
+/* ============================================================
+   保质期数据库（常见中文食材）
+   ============================================================ */
+const SHELF_DB = {
+  // 蔬菜（冷藏）
+  '白菜':{days:14,storage:'fridge'}, '菠菜':{days:3,storage:'fridge'}, '生菜':{days:5,storage:'fridge'},
+  '西红柿':{days:7,storage:'fridge'}, '番茄':{days:7,storage:'fridge'}, '土豆':{days:30,storage:'room'},
+  '马铃薯':{days:30,storage:'room'}, '洋葱':{days:30,storage:'room'}, '胡萝卜':{days:21,storage:'fridge'},
+  '黄瓜':{days:7,storage:'fridge'}, '茄子':{days:5,storage:'fridge'}, '青椒':{days:7,storage:'fridge'},
+  '辣椒':{days:10,storage:'fridge'}, '韭菜':{days:3,storage:'fridge'}, '芹菜':{days:7,storage:'fridge'},
+  '西兰花':{days:5,storage:'fridge'}, '花椰菜':{days:5,storage:'fridge'}, '蘑菇':{days:4,storage:'fridge'},
+  '香菇':{days:7,storage:'fridge'}, '金针菇':{days:5,storage:'fridge'}, '豆腐':{days:3,storage:'fridge'},
+  '豆芽':{days:2,storage:'fridge'}, '南瓜':{days:30,storage:'room'}, '冬瓜':{days:30,storage:'room'},
+  // 水果
+  '苹果':{days:14,storage:'fridge'}, '香蕉':{days:5,storage:'room'}, '橙子':{days:14,storage:'fridge'},
+  '橘子':{days:14,storage:'fridge'}, '柠檬':{days:21,storage:'fridge'}, '葡萄':{days:7,storage:'fridge'},
+  '草莓':{days:3,storage:'fridge'}, '蓝莓':{days:7,storage:'fridge'}, '西瓜':{days:7,storage:'fridge'},
+  '桃子':{days:5,storage:'fridge'}, '梨':{days:14,storage:'fridge'}, '芒果':{days:7,storage:'fridge'},
+  // 肉禽蛋（冷藏/冷冻）
+  '鸡胸肉':{days:2,storage:'fridge'}, '鸡腿':{days:2,storage:'fridge'}, '鸡肉':{days:2,storage:'fridge'},
+  '猪肉':{days:3,storage:'fridge'}, '五花肉':{days:3,storage:'fridge'}, '排骨':{days:3,storage:'fridge'},
+  '牛肉':{days:3,storage:'fridge'}, '牛排':{days:3,storage:'fridge'}, '羊肉':{days:3,storage:'fridge'},
+  '鸡蛋':{days:21,storage:'fridge'}, '鸭蛋':{days:21,storage:'fridge'}, '鹌鹑蛋':{days:21,storage:'fridge'},
+  '培根':{days:7,storage:'fridge'}, '香肠':{days:14,storage:'fridge'}, '火腿':{days:14,storage:'fridge'},
+  '鱼':{days:2,storage:'fridge'}, '三文鱼':{days:2,storage:'fridge'}, '虾':{days:2,storage:'fridge'},
+  '螃蟹':{days:2,storage:'fridge'}, '鱿鱼':{days:2,storage:'fridge'}, '贝':{days:2,storage:'fridge'},
+  // 冷冻通用
+  '冷冻鸡胸':{days:90,storage:'frozen'}, '冷冻虾':{days:90,storage:'frozen'}, '冷冻饺子':{days:90,storage:'frozen'},
+  // 奶制品
+  '牛奶':{days:7,storage:'fridge'}, '酸奶':{days:14,storage:'fridge'}, '奶酪':{days:30,storage:'fridge'},
+  '黄油':{days:60,storage:'fridge'}, '奶油':{days:14,storage:'fridge'},
+  // 米面粮油
+  '大米':{days:180,storage:'room'}, '面粉':{days:180,storage:'room'}, '面条':{days:30,storage:'room'},
+  '面包':{days:5,storage:'room'}, '馒头':{days:3,storage:'room'}, '包子':{days:3,storage:'room'},
+  '食用油':{days:365,storage:'room'}, '酱油':{days:365,storage:'room'}, '醋':{days:365,storage:'room'},
+  '盐':{days:1825,storage:'room'}, '糖':{days:730,storage:'room'},
+  // 调料
+  '蒜':{days:30,storage:'room'}, '生姜':{days:21,storage:'room'}, '葱':{days:7,storage:'fridge'},
+  '香菜':{days:5,storage:'fridge'}, '小米椒':{days:14,storage:'fridge'},
+  // 饮品
+  '可乐':{days:180,storage:'room'}, '啤酒':{days:180,storage:'room'}, '果汁':{days:7,storage:'fridge'},
+  '矿泉水':{days:365,storage:'room'},
+};
+function shelfFor(name){
+  const k = normalize(name);
+  // 优先精确匹配
+  if(SHELF_DB[k]) return SHELF_DB[k];
+  // 子串匹配
+  for(const key in SHELF_DB){
+    if(k.includes(key) || key.includes(k)) return SHELF_DB[key];
+  }
+  return {days:7, storage:'fridge'}; // 默认
+}
+
+/* ============================================================
+   食材归一化（智能分类）
+   目的：OCR / 语音 / 手动输入的不同描述归一到同一"本质类"
+   例如："COLACAO 未碱化天然可可粉" → 可可粉
+        "QUAKER/桂格五黑混合即食冲饮" → 燕麦冲饮
+   ============================================================ */
+// 噪音词：去掉不影响食材本义的词
+const NOISE_TOKENS = [
+  // 品牌前缀（纯英文部分单独剥离）
+  // 规格词
+  '袋装','盒装','罐装','瓶装','袋','盒','罐','瓶','件','包','份',
+  '原味','纯味','香草味','巧克力味','草莓味','抹茶味','红豆味',
+  '小包装','大包装','家庭装','分享装','促销装','试用装','迷你装',
+  '未碱化','碱化','天然','精选','优质','特级','正品','原装','进口','国产',
+  '纯天然','无添加','无糖','低糖','含糖','减脂','脱脂','全脂','低脂',
+  '高钙','高蛋白','高纤维','富含','强化','营养','健康','养生',
+  '破损包退','包邮','包退','换新','上门','天价保','价保','7天','3天','15天','30天',
+  '免费','赠送','加量','加赠','买一送一','买二送一','特价','折扣','促销','热卖','爆款',
+  '有限公司','股份','集团','官方','旗舰','专卖','直营','专营','自营',
+  '新','老','升级版','经典版','限定版','纪念版',
+  'x1','x2','x3','×1','×2','×3','1件','2件','3件','一件','两件','三件',
+  'g/','g/袋','g/盒','g/件','kg/','ml/','l/',
+  '/袋','/盒','/罐','/瓶','/件','/包','/份',
+];
+// 品牌后缀（OCR 常见：COLACAO/、QUAKER/、桂格/...）
+const BRAND_RE = /^[A-Za-z][A-Za-z\s&-]{1,20}\/\s*/;
+
+// 归一词典：[关键词列表 → 归一类名]
+const CATEGORY_RULES = [
+  // 可可粉 / 巧克力
+  {kw:['可可粉','可可','cacao','cocoa','cola cao'], cat:'可可粉'},
+  {kw:['巧克力'], cat:'巧克力'},
+  // 燕麦 / 麦片 / 即食冲饮
+  {kw:['燕麦','麦片','即食冲饮','五黑','五红','八宝','冲饮','冲调','糊','代餐'], cat:'燕麦冲饮'},
+  // 咖啡
+  {kw:['咖啡','拿铁','卡布奇诺','美式咖啡'], cat:'咖啡'},
+  // 奶茶 / 茶饮
+  {kw:['奶茶','茶饮','果茶','乌龙茶','绿茶','红茶','普洱'], cat:'茶饮'},
+  // 奶粉 / 牛奶
+  {kw:['奶粉','牛奶粉'], cat:'奶粉'},
+  {kw:['纯牛奶','鲜牛奶','高钙奶','儿童奶','成人牛奶'], cat:'牛奶'},
+  {kw:['酸奶','乳酸菌','益生菌'], cat:'酸奶'},
+  // 面粉/烘焙
+  {kw:['低筋面粉','高筋面粉','中筋面粉','面粉','小麦粉'], cat:'面粉'},
+  {kw:['烘焙','蛋糕粉','饼干粉','桃酥粉','酥皮粉'], cat:'烘焙原料'},
+  // 米面粮油
+  {kw:['大米','稻花香','珍珠米','丝苗米','香米'], cat:'大米'},
+  {kw:['面条','挂面','拉面','意面','通心粉','意大利面','spaghetti','pasta'], cat:'面条'},
+  {kw:['面包','吐司','三明治','汉堡'], cat:'面包'},
+  {kw:['馒头','包子','花卷','烧麦','饺子','馄饨'], cat:'面食'},
+  {kw:['食用油','花生油','玉米油','葵花油','橄榄油','菜籽油','芝麻油','色拉油'], cat:'食用油'},
+  {kw:['酱油','生抽','老抽','蒸鱼豉油'], cat:'酱油'},
+  {kw:['醋','米醋','陈醋','香醋','白醋'], cat:'醋'},
+  {kw:['糖','白砂糖','冰糖','红糖','木糖醇'], cat:'糖'},
+  {kw:['盐','食盐','海盐','岩盐','低钠盐'], cat:'盐'},
+  // 调味料
+  {kw:['鸡精','味精','味之素'], cat:'味精'},
+  {kw:['料酒','黄酒','米酒'], cat:'料酒'},
+  {kw:['蚝油','鱼露','蒸鱼豉油'], cat:'蚝油'},
+  {kw:['辣椒酱','豆瓣酱','甜面酱','黄豆酱','番茄酱','沙拉酱','千岛酱','花生酱','果酱','草莓酱','蓝莓酱'], cat:'调味酱'},
+  // 零食
+  {kw:['薯片','饼干','曲奇','威化','锅巴','米果'], cat:'零食'},
+  {kw:['坚果','瓜子','花生','核桃','杏仁','腰果','开心果','夏威夷果'], cat:'坚果'},
+  {kw:['巧克力豆','糖果','软糖','硬糖','棒棒糖'], cat:'糖果'},
+  {kw:['蜜饯','果干','葡萄干','蔓越莓干','芒果干'], cat:'果干'},
+  // 饮料
+  {kw:['可乐','雪碧','芬达','美汁源','七喜'], cat:'汽水'},
+  {kw:['矿泉水','纯净水','蒸馏水'], cat:'矿泉水'},
+  {kw:['啤酒','青岛啤酒','百威','雪花','喜力'], cat:'啤酒'},
+  {kw:['果汁','橙汁','苹果汁','葡萄汁','桃汁'], cat:'果汁'},
+  // 鸡蛋/肉/水产（按部位细分，避免价格差异大的部位被错误合并）
+  {kw:['鸡蛋','土鸡蛋','柴鸡蛋','洋鸡蛋','草鸡蛋','鹌鹑蛋','鸭蛋'], cat:'鸡蛋'},
+  // 鸡肉：鸡胸肉单独保留（健身/低脂常用），其他部位合并为鸡肉
+  {kw:['鸡胸肉','鸡胸','鸡里肌','鸡大胸','鸡小胸'], cat:'鸡胸肉'},
+  {kw:['鸡腿','琵琶腿','鸡全腿'], cat:'鸡腿'},
+  {kw:['鸡翅','鸡翅根','鸡翅中','鸡翅尖','鸡全翅'], cat:'鸡翅'},
+  {kw:['鸡爪','凤爪','鸡爪尖'], cat:'鸡爪'},
+  {kw:['鸡肉','童子鸡','三黄鸡','乌鸡','整鸡','鸡块'], cat:'鸡肉'},
+  // 猪肉：细分部位避免合并错误
+  {kw:['排骨','猪排','肋排','小排','大排','猪小排','猪大排','猪肋排'], cat:'排骨'},
+  {kw:['五花肉'], cat:'五花肉'},
+  {kw:['里脊肉','猪里脊'], cat:'里脊肉'},
+  {kw:['梅花肉','猪梅花'], cat:'梅花肉'},
+  {kw:['猪蹄','猪肘','猪手'], cat:'猪蹄'},
+  {kw:['猪肝'], cat:'猪肝'},
+  {kw:['猪肉'], cat:'猪肉'},
+  // 牛肉：每个部位单独保留（价格差异大）
+  {kw:['牛排'], cat:'牛排'},
+  {kw:['牛腩'], cat:'牛腩'},
+  {kw:['牛腱','牛腱子'], cat:'牛腱'},
+  {kw:['牛尾'], cat:'牛尾'},
+  {kw:['牛筋'], cat:'牛筋'},
+  {kw:['牛肋条','牛肋'], cat:'牛肋条'},
+  {kw:['五花趾'], cat:'五花趾'},
+  {kw:['肥牛','肥牛卷','雪花牛肉'], cat:'肥牛'},
+  {kw:['牛肉','黄牛肉','水牛肉'], cat:'牛肉'},
+  {kw:['羊肉','羊排','羊腿','羊肉卷','羊蝎子'], cat:'羊肉'},
+  // 鱼/水产按种类细分
+  {kw:['草鱼','鲈鱼','鲫鱼','带鱼','黄花鱼','鳕鱼','龙利鱼','巴沙鱼','鲳鱼','鲶鱼','鲤鱼','青鱼'], cat:'鱼'},
+  {kw:['三文鱼','金枪鱼','鳗鱼','马鲛鱼'], cat:'鱼'},
+  {kw:['虾','基围虾','对虾','大虾','虾仁','虾皮','明虾','白虾','皮皮虾'], cat:'虾'},
+  {kw:['螃蟹','大闸蟹','梭子蟹','蟹'], cat:'螃蟹'},
+  {kw:['蛤蜊','花蛤','扇贝','生蚝','牡蛎','鲍鱼','海螺','青口','贻贝','蛏子'], cat:'贝类'},
+  {kw:['鱿鱼','墨鱼','章鱼','八爪鱼','海参'], cat:'海鲜'},
+  // 蔬果
+  {kw:['白菜','大白菜','小白菜','娃娃菜'], cat:'白菜'},
+  {kw:['西红柿','番茄','圣女果','小番茄'], cat:'番茄'},
+  {kw:['土豆','马铃薯','洋芋'], cat:'土豆'},
+  {kw:['洋葱','红葱头'], cat:'洋葱'},
+  {kw:['胡萝卜'], cat:'胡萝卜'},
+  {kw:['黄瓜','小黄瓜'], cat:'黄瓜'},
+  {kw:['茄子','紫茄子'], cat:'茄子'},
+  {kw:['青椒','彩椒','尖椒'], cat:'青椒'},
+  {kw:['辣椒','小米椒','朝天椒','干辣椒'], cat:'辣椒'},
+  {kw:['西兰花','花椰菜','菜花'], cat:'花菜'},
+  {kw:['蘑菇','口蘑','平菇','杏鲍菇','金针菇','白玉菇'], cat:'蘑菇'},
+  {kw:['香菇','花菇','冬菇','干香菇'], cat:'香菇'},
+  {kw:['豆腐','嫩豆腐','老豆腐','内酯豆腐','豆腐皮','腐竹','豆腐干'], cat:'豆腐'},
+  {kw:['苹果','红富士','蛇果','嘎啦'], cat:'苹果'},
+  {kw:['香蕉'], cat:'香蕉'},
+  {kw:['橙子','脐橙'], cat:'橙子'},
+  {kw:['葡萄','提子'], cat:'葡萄'},
+  {kw:['草莓'], cat:'草莓'},
+  {kw:['蓝莓'], cat:'蓝莓'},
+  {kw:['西瓜'], cat:'西瓜'},
+  {kw:['桃','水蜜桃','毛桃'], cat:'桃子'},
+  {kw:['梨','雪梨','鸭梨','香梨'], cat:'梨'},
+  {kw:['芒果'], cat:'芒果'},
+  {kw:['柠檬'], cat:'柠檬'},
+];
+
+// 归一类名 → 默认单位
+// 可可粉/咖啡/调料 → g (粉末)
+// 冲饮类 → g 或 portion
+// 蔬果蛋奶 → count
+const DEFAULT_UNIT = {
+  '可可粉':'g','巧克力':'g','咖啡':'g','茶饮':'g','燕麦冲饮':'g','奶粉':'g','面粉':'g','烘焙原料':'g',
+  '大米':'g','面条':'g','面包':'portion','面食':'portion',
+  '食用油':'ml','酱油':'ml','醋':'ml','糖':'g','盐':'g',
+  '味精':'g','料酒':'ml','蚝油':'ml','调味酱':'g',
+  '鸡蛋':'count','鸡胸肉':'g','鸡腿':'g','鸡翅':'g','鸡爪':'g','鸡肉':'g',
+  '排骨':'g','五花肉':'g','里脊肉':'g','梅花肉':'g','猪蹄':'g','猪肝':'g','猪肉':'g',
+  '牛排':'g','牛腩':'g','牛腱':'g','牛尾':'g','牛筋':'g','牛肋条':'g','五花趾':'g','肥牛':'g','牛肉':'g',
+  '羊肉':'g','鱼':'g','虾':'g','螃蟹':'count','贝类':'g','海鲜':'g',
+  '白菜':'count','番茄':'count','土豆':'count','洋葱':'count','胡萝卜':'count','黄瓜':'count','茄子':'count',
+  '青椒':'count','辣椒':'count','花菜':'count','蘑菇':'g','香菇':'g','豆腐':'g',
+  '苹果':'count','香蕉':'count','橙子':'count','葡萄':'g','草莓':'count','蓝莓':'g','西瓜':'count','桃子':'count','梨':'count','芒果':'count','柠檬':'count',
+  '牛奶':'ml','酸奶':'ml',
+  '汽水':'ml','矿泉水':'ml','啤酒':'ml','果汁':'ml',
+  '零食':'portion','坚果':'g','糖果':'portion','果干':'g',
+};
+function defaultUnit(name){
+  return DEFAULT_UNIT[name] || 'portion';
+}
+
+function normalizeFoodName(raw){
+  if(!raw) return {canonical:'', display:raw||''};
+  let s = raw.trim();
+
+  // 1) 去掉品牌前缀（英文/中文品牌后跟 /）
+  s = s.replace(BRAND_RE, '');
+
+  // 2) 去掉规格/数字词
+  //    数字+单位（如 "518g"、"1kg"、"100ml"、"1L"）
+  s = s.replace(/\d+\.?\d*\s*(g|kg|ml|l|斤|两|克|千克|毫升|升)\b/gi, '');
+  //    "7天"/"3天"/"30天" 等天数（"X天价保" "X天无理由" 都属于促销噪音）
+  s = s.replace(/\d+\s*天/g, '');
+  //    纯数字串
+  s = s.replace(/\b\d+(\.\d+)?\b/g, '');
+  s = s.replace(/\bx\d+\b/gi, '').replace(/\b×\d+\b/g, '');
+
+  // 3) 去掉噪音词（多次循环，处理连续出现的）
+  for(let pass=0;pass<3;pass++){
+    let before = s;
+    for(const w of NOISE_TOKENS){
+      const esc = w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      s = s.replace(new RegExp(esc,'g'), '');
+    }
+    if(s===before) break;
+  }
+
+  // 4) 清理多余空格、标点、孤立单字（连续标点中间的孤立字）
+  s = s.replace(/[\s\u3000]+/g,'')
+       .replace(/^[、,，.\-—_/\\]+|[、,，.\-—_/\\]+$/g,'')
+       .replace(/([、,，.\-—_/\\])\1+/g,'$1') // 合并连续标点
+       .trim();
+
+  if(!s){ return {canonical:raw.trim(), display:raw.trim()}; }
+
+  // 5) 在归一词典中找匹配（优先长关键词）
+  const sorted = [...CATEGORY_RULES].sort((a,b)=>Math.max(...b.kw.map(k=>k.length))-Math.max(...a.kw.map(k=>k.length)));
+  for(const rule of sorted){
+    for(const kw of rule.kw){
+      if(s.includes(kw)) return {canonical:rule.cat, display:raw.trim()};
+    }
+  }
+
+  // 6) 词典没命中，但去噪后仍有中文 → 用去噪后的字符串作为归一名
+  if(/[\u4e00-\u9fa5]/.test(s) && s.length>=2){
+    return {canonical:s, display:raw.trim()};
+  }
+  return {canonical:raw.trim(), display:raw.trim()};
+}
+
+/* ============================================================
+   工具函数
+   ============================================================ */
+const save=async()=>{
+  try{
+    localStorage.setItem(KEY, JSON.stringify(db));
+    await saveToGist(db);
+    render();
+  }catch(e){ toast('保存失败：'+e.message); }
+};
+const money=n=>'¥'+Number(n||0).toFixed(2);
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtDate=d=>{ if(!d) return ''; return new Date(d+'T00:00:00').toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'short'}); };
+const unitText=u=>({g:'g',ml:'ml',count:'个',portion:'份'}[u]||u);
+const daysBetween=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
+
+document.getElementById('today').textContent = fmtDate(today());
+
+let toastTimer;
+function toast(msg, ms=1800){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'), ms);
+}
+
+/* ============================================================
+   模糊匹配
+   ============================================================ */
+function normalize(s){ return (s||'').trim().toLowerCase().replace(/\s+/g,''); }
+function levenshtein(a,b){
+  if(a===b) return 0;
+  const m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  const dp=Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0]=i;
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
+    const c=a[i-1]===b[j-1]?0:1;
+    dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+c);
+  }
+  return dp[m][n];
+}
+function similarity(a,b){
+  const na=normalize(a), nb=normalize(b);
+  if(!na||!nb) return 0;
+  if(na.includes(nb)||nb.includes(na)) return 0.99;
+  const d=levenshtein(na,nb);
+  const max=Math.max(na.length, nb.length);
+  return 1 - d/max;
+}
+function findSimilar(name, threshold=0.6){
+  const set=new Map();
+  db.foods.forEach(f=>{ if(!set.has(f.name)) set.set(f.name,true); });
+  const matches=[];
+  set.forEach((_,n)=>{
+    const s=similarity(name, n);
+    if(s>=threshold) matches.push({name:n, score:s});
+  });
+  matches.sort((a,b)=>b.score-a.score);
+  return matches.slice(0,3);
+}
+
+/* ============================================================
+   页面切换 + 弹层
+   ============================================================ */
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+function modal(html){ document.getElementById('modalContent').innerHTML=html; document.getElementById('modal').classList.add('show'); }
+function closeModal(){ document.getElementById('modal').classList.remove('show'); }
+document.addEventListener('click', e=>{
+  const m=document.getElementById('modal');
+  if(e.target===m) closeModal();
+});
+
+/* ============================================================
+   外食
+   ============================================================ */
+function openOutside(id){
+  const item = id ? db.outside.find(x=>x.id===id) : null;
+  modal(`<h2>${item?'编辑外食':'记录外食'}</h2>
+    <label>日期</label><input id="oDate" type="date" value="${item?item.date:today()}">
+    <label>餐次</label><select id="oMeal">
+      ${['早餐','午餐','晚餐','其他'].map(m=>`<option ${item&&item.meal===m?'selected':''}>${m}</option>`).join('')}
+    </select>
+    <label>金额</label><input id="oAmount" type="number" step="0.01" placeholder="例如 35" value="${item?item.amount:''}">
+    <label>备注</label><input id="oNote" placeholder="例如 拉面" value="${item?escapeAttr(item.note||''):''}">
+    <button class="primary" style="margin-top:18px" onclick="${item?`saveOutsideEdit(${id})`:'addOutside()'}">保存</button>`);
+}
+function escapeAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+function addOutside(){
+  const a=+document.getElementById('oAmount').value;
+  if(!a||a<=0){ toast('请填写金额'); return; }
+  db.outside.push({id:Date.now(),date:document.getElementById('oDate').value,meal:document.getElementById('oMeal').value,amount:a,note:document.getElementById('oNote').value});
+  closeModal(); save(); toast('已记录');
+}
+function saveOutsideEdit(id){
+  const a=+document.getElementById('oAmount').value;
+  if(!a||a<=0){ toast('请填写金额'); return; }
+  const item=db.outside.find(x=>x.id===id);
+  if(!item){ closeModal(); return; }
+  Object.assign(item,{date:document.getElementById('oDate').value,meal:document.getElementById('oMeal').value,amount:a,note:document.getElementById('oNote').value});
+  closeModal(); save(); toast('已更新');
+}
+function delOutside(id){ db.outside=db.outside.filter(x=>x.id!==id); save(); toast('已删除'); }
+
+/* ============================================================
+   采购（手动）
+   ============================================================ */
+function openBuy(){
+  modal(`<h2>登记采购</h2>
+    <label>日期</label><input id="bDate" type="date" value="${today()}">
+    <label>食材</label><input id="bName" placeholder="例如 鸡胸肉" oninput="onBuyNameInput()">
+    <div id="dupWarn"></div>
+    <label>购买金额</label><input id="bAmount" type="number" step="0.01" placeholder="例如 25">
+    <label>计量方式</label><select id="bUnit">
+      <option value="g">克（g）</option><option value="ml">毫升（ml）</option>
+      <option value="count">个</option><option value="portion">份/盒/袋</option>
+    </select>
+    <label>购买总量</label><input id="bQty" type="number" step="0.01" placeholder="例如 500">
+    <label>保存方式</label>
+    <div class="storage-tabs" id="storageTabs">
+      <button data-s="fridge" class="active">🧊 冷藏</button>
+      <button data-s="frozen">❄ 冷冻</button>
+      <button data-s="room">🌡 常温</button>
+    </div>
+    <button class="primary" style="margin-top:18px" onclick="addFood()">加入库存</button>`);
+  document.querySelectorAll('#storageTabs button').forEach(b=>{
+    b.onclick=()=>{ document.querySelectorAll('#storageTabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); };
+  });
+  setTimeout(()=>document.getElementById('bName').focus(),50);
+}
+function onBuyNameInput(){
+  const n=document.getElementById('bName').value;
+  const box=document.getElementById('dupWarn');
+  if(!n.trim()){ box.innerHTML=''; return; }
+  const matches=findSimilar(n, 0.6);
+  if(!matches.length){ box.innerHTML=''; return; }
+  box.innerHTML=`<div class="dup-warn">⚠ 已存在相似食材，避免重复建批：
+    ${matches.map(m=>`<div class="row"><div>· <b>${m.name}</b> <span class="muted">（相似 ${(m.score*100).toFixed(0)}%）</span></div>
+      <button class="ghost" onclick="useExisting('${m.name.replace(/'/g,"\\'")}')">合并到旧批</button></div>`).join('')}
+    </div>`;
+}
+function useExisting(name){
+  document.getElementById('bName').value=name;
+  document.getElementById('dupWarn').innerHTML=`<div class="dup-warn">✓ 已合并到 <b>${name}</b>，保存后将累加到现有批次。</div>`;
+  toast('已合并命名');
+}
+function getSelectedStorage(){ const a=document.querySelector('#storageTabs button.active'); return a?a.dataset.s:'fridge'; }
+function addFood(){
+  const rawN=document.getElementById('bName').value.trim();
+  const a=+document.getElementById('bAmount').value;
+  const q=+document.getElementById('bQty').value;
+  const u=document.getElementById('bUnit').value;
+  const date=document.getElementById('bDate').value;
+  const storage=getSelectedStorage();
+  if(!rawN){ toast('请填写食材名'); return; }
+  if(!a||a<=0){ toast('请填写金额'); return; }
+  if(!q||q<=0){ toast('请填写数量'); return; }
+
+  // 归一化食材名（去除品牌、规格、促销词噪音，归到本质类）
+  const norm = normalizeFoodName(rawN);
+  const n = norm.canonical || rawN;
+
+  const shelf = SHELF_DB[normalize(n)] || shelfFor(n);
+
+  const existing = db.foods.find(f=>f.name===n && f.date===date);
+  if(existing){
+    // 合并：保持单价不变，累加 amount 和 qty
+    const oldUnitPrice = existing.amount / existing._origQty;
+    existing._origQty += q;
+    existing.qty += q;
+    existing.amount += a;
+    existing.remaining = oldUnitPrice * existing.qty;
+    existing.unitPrice = existing.amount / existing._origQty;
+    closeModal(); save(); toast(n!==rawN ? `已合并到「${n}」同日批次` : '已合并到同日批次');
+    return;
+  }
+  // 计算过期日期
+  const exp=new Date(date+'T00:00:00');
+  exp.setDate(exp.getDate() + (storage==='frozen' ? Math.max(30, shelf.days) : shelf.days));
+
+  db.foods.push({
+    id:Date.now(), date, name:n, displayName: norm.display||rawN, amount:a, remaining:a, qty:q, _origQty:q, unit:u,
+    unitPrice: a/q,
+    batchKey:n+'|'+date, storage,
+    shelfLifeDays: shelf.days,
+    expiresAt: exp.toISOString().slice(0,10),
+    lowStockThreshold: Math.max(1, Math.round(q*0.2))
+  });
+  closeModal(); save(); toast(n!==rawN ? `已加入：${n}（原: ${rawN}）` : '已加入库存');
+}
+
+/* ============================================================
+   做饭
+   ============================================================ */
+function openCook(){
+  const usable=db.foods.filter(f=>f.remaining>0.001);
+  if(!usable.length){
+    modal(`<h2>记录做饭</h2>
+      <div class="empty">还没有可用库存<br>请先去库存页登记买菜</div>
+      <button class="primary" onclick="closeModal()">知道了</button>`);
+    return;
+  }
+
+  // 检查快过期的食材，顶部提示
+  const todayStr = today();
+  const soonExpiring = usable.filter(f => {
+    const d = daysBetween(todayStr, f.expiresAt);
+    return d >= 0 && d <= 3;
+  });
+  // 按食材名去重，每名只提示一次
+  const soonByName = {};
+  for(const f of soonExpiring){
+    if(!soonByName[f.name]) soonByName[f.name] = f;
+  }
+  const soonNames = Object.values(soonByName);
+  const soonHint = soonNames.length
+    ? `<div class="dup-warn" style="margin:8px 0 12px">⏳ 冰箱里有 <b>${soonNames.length}</b> 种食材快过期了（${soonNames.slice(0,3).map(f=>f.name).join('、')}${soonNames.length>3?' 等':''}），建议优先消耗</div>`
+    : '';
+
+  modal(`<h2>记录做饭</h2>
+    ${soonHint}
+    <label>日期</label><input id="cDate" type="date" value="${today()}">
+    <label>餐次</label><select id="cMeal">
+      ${['早餐','午餐','晚餐','其他'].map(m=>`<option>${m}</option>`).join('')}
+    </select>
+    <div id="cookRows"></div>
+    <button class="secondary" style="margin-top:10px" onclick="addCookRow()">＋ 添加食材</button>
+    <div id="cookTotal" style="font-weight:700;font-size:22px;margin:18px 0">本餐 ¥0.00</div>
+    <button class="primary" onclick="saveCook()">保存本餐</button>`);
+  addCookRow();
+}
+function addCookRow(){
+  const wrap=document.getElementById('cookRows');
+  // 按"最早过期日期"升序：取每个食材名下所有批次的最小 expiresAt
+  const usable = db.foods.filter(f=>f.remaining>0.001);
+  const nameMap = new Map();
+  for(const f of usable){
+    const cur = nameMap.get(f.name);
+    if(!cur || f.expiresAt < cur.expiresAt){
+      nameMap.set(f.name, f);
+    }
+  }
+  const groups = [...nameMap.entries()]
+    .sort((a,b)=>a[1].expiresAt.localeCompare(b[1].expiresAt))
+    .map(([name])=>name);
+  if(!groups.length){ toast('无可用库存'); return; }
+  const div=document.createElement('div'); div.className='food';
+  // 给每个 option 加 data-expires 便于测试和展示
+  div.innerHTML=`<select class="foodName" onchange="updateCook()">${groups.map(n=>{
+    const f = nameMap.get(n);
+    const d = daysBetween(today(), f.expiresAt);
+    const tag = d<0 ? '⚠过期' : d===0 ? '⏳今天' : d<=3 ? `⏳${d}天` : '';
+    return `<option value="${n}">${n}${tag?` (${tag})`:''}</option>`;
+  }).join('')}</select>
+    <div style="display:flex;gap:7px;margin-top:7px">
+      <select class="useMode" onchange="toggleUseInput(this);updateCook()">
+        <option value="qty">精准数量</option>
+        <option value="half">1/2</option>
+        <option value="third">1/3</option>
+        <option value="quarter">1/4</option>
+        <option value="remain">剩余</option>
+      </select>
+      <input class="useQty" type="number" step="0.01" placeholder="数量" oninput="updateCook()">
+      <button class="danger" onclick="this.parentElement.parentElement.remove();updateCook()">删除</button>
+    </div>`;
+  wrap.appendChild(div);
+  toggleUseInput(div.querySelector('.useMode'));
+  updateCook();
+}
+function toggleUseInput(sel){ sel.parentElement.querySelector('.useQty').style.display = sel.value==='qty' ? 'block' : 'none'; }
+
+function fifoPreview(name, qty, mode){
+  const batches=db.foods.filter(f=>f.name===name && f.remaining>0.001).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+  let need, cost=0;
+  if(mode!=='qty'){
+    const totalQty=batches.reduce((s,f)=>s+f.qty,0);
+    need = mode==='remain' ? totalQty : totalQty*({half:.5, third:1/3, quarter:.25}[mode]||1);
+  } else { need=qty; }
+  for(const f of batches){
+    if(need<=1e-9) break;
+    const take=Math.min(f.qty, need);
+    cost += take/f.qty*f.amount;
+    need -= take;
+  }
+  return {cost, need};
+}
+function updateCook(){
+  let total=0;
+  document.querySelectorAll('#cookRows .food').forEach(r=>{
+    const name=r.querySelector('.foodName').value;
+    const mode=r.querySelector('.useMode').value;
+    const qty=mode==='qty' ? (+r.querySelector('.useQty').value||0) : 0;
+    total += fifoPreview(name,qty,mode).cost;
+  });
+  document.getElementById('cookTotal').textContent='本餐 '+money(total);
+}
+function saveCook(){
+  const date=document.getElementById('cDate').value;
+  const meal=document.getElementById('cMeal').value;
+  const items=[], rows=[...document.querySelectorAll('#cookRows .food')];
+  if(!rows.length){ toast('至少添加一个食材'); return; }
+  let total=0;
+  for(const r of rows){
+    const name=r.querySelector('.foodName').value;
+    const mode=r.querySelector('.useMode').value;
+    const qty=mode==='qty' ? (+r.querySelector('.useQty').value||0) : 0;
+    const preview = fifoPreview(name, qty, mode);
+    if(preview.need > 1e-8){ toast(`${name} 库存不足`); return; }
+  }
+  for(const r of rows){
+    const name=r.querySelector('.foodName').value;
+    const mode=r.querySelector('.useMode').value;
+    let need;
+    if(mode==='qty'){ need = (+r.querySelector('.useQty').value||0); }
+    else{
+      const totalQty = db.foods.filter(f=>f.name===name && f.remaining>0.001).reduce((s,f)=>s+f.qty,0);
+      need = mode==='remain' ? totalQty : totalQty*({half:.5, third:1/3, quarter:.25}[mode]||1);
+    }
+    if(need<=0) continue;
+    const batches=db.foods.filter(f=>f.name===name && f.remaining>0.001).sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+    for(const f of batches){
+      if(need<=1e-9) break;
+      const take=Math.min(f.qty, need);
+      const up = f.unitPrice || (f._origQty>0 ? f.amount/f._origQty : 0);
+      const cost = take * up;
+      f.qty -= take;
+      f.remaining = f.qty * up;
+      items.push({foodId:f.id,name:f.name,qty:take,unit:f.unit,cost,ratio:mode,batchDate:f.date});
+      total += cost;
+      need  -= take;
+    }
+  }
+  if(!items.length){ toast('没有可保存的食材'); return; }
+  db.meals.push({id:Date.now(),date,meal,total,items});
+  closeModal(); save(); toast('本餐已保存');
+}
+
+function openMealEdit(id){
+  const m=db.meals.find(x=>x.id===id);
+  if(!m) return;
+  modal(`<h2>编辑做饭</h2>
+    <label>日期</label><input id="mDate" type="date" value="${m.date}">
+    <label>餐次</label><select id="mMeal">
+      ${['早餐','午餐','晚餐','其他'].map(v=>`<option ${m.meal===v?'selected':''}>${v}</option>`).join('')}
+    </select>
+    <div class="muted" style="margin-top:12px">注意：编辑会先把本餐扣减的食材数量加回库存，再按新记录消耗。</div>
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="primary" onclick="saveMealEdit(${id})">保存</button>
+      <button class="danger" onclick="delMeal(${id});closeModal()">删除整餐</button>
+    </div>`);
+}
+function saveMealEdit(id){
+  const m=db.meals.find(x=>x.id===id);
+  if(!m){ closeModal(); return; }
+  m.items.forEach(it=>{
+    const f=db.foods.find(x=>x.id===it.foodId);
+    if(f){ const up = f.unitPrice || (f._origQty>0 ? f.amount/f._origQty : 0); f.qty += it.qty; f.remaining = f.qty * up; }
+  });
+  db.meals = db.meals.filter(x=>x.id!==id);
+  closeModal(); save();
+  openCook();
+  setTimeout(()=>{
+    if(document.getElementById('cDate')) document.getElementById('cDate').value=document.getElementById('mDate')?document.getElementById('mDate').value:m.date;
+    const cMeal=document.getElementById('cMeal'); if(cMeal) cMeal.value=m.meal;
+  },50);
+  toast('原食材已退回，请重新选择');
+}
+function delMeal(id){
+  const m=db.meals.find(x=>x.id===id);
+  if(!m) return;
+  if(!confirm(`删除这餐（${m.meal} ¥${m.total.toFixed(2)}）？食材数量会回退到库存。`)) return;
+  m.items.forEach(it=>{
+    const f=db.foods.find(x=>x.id===it.foodId);
+    if(f){ const up = f.unitPrice || (f._origQty>0 ? f.amount/f._origQty : 0); f.qty += it.qty; f.remaining = f.qty * up; }
+  });
+  db.meals = db.meals.filter(x=>x.id!==id);
+  save(); toast('已删除，库存已回退');
+}
+function delFood(id){
+  if(!confirm('删除这个食材？关联的做饭账目不会自动调整。')) return;
+  db.foods = db.foods.filter(x=>x.id!==id);
+  save(); toast('已删除');
+}
+
+/* ============================================================
+   库存编辑
+   ============================================================ */
+function editFood(id){
+  const f = db.foods.find(x=>x.id===id);
+  if(!f) return;
+  modal(`<h2>编辑库存</h2>
+    <label>食材名</label>
+    <input id="eName" type="text" value="${escapeAttr(f.displayName||f.name)}">
+    <div class="muted" style="margin-top:-4px">归一类：<b>${escapeAttr(f.name)}</b></div>
+    <label>购买日期</label>
+    <input id="eDate" type="date" value="${f.date}">
+    <label>金额 ¥</label>
+    <input id="eAmount" type="number" step="0.01" value="${f.amount}">
+    <label>数量</label>
+    <div style="display:flex;gap:8px">
+      <input id="eQty" type="number" step="0.01" value="${f.qty}" style="flex:2">
+      <select id="eUnit" style="flex:1">
+        ${['g','ml','count','portion'].map(u=>`<option value="${u}" ${u===f.unit?'selected':''}>${unitText(u)}</option>`).join('')}
+      </select>
+    </div>
+    <label>存储方式</label>
+    <div class="storage-tabs" id="eStorage">
+      <button data-s="fridge">🧊 冷藏</button>
+      <button data-s="frozen">❄ 冷冻</button>
+      <button data-s="room">🌡 常温</button>
+    </div>
+    <label>过期日期</label>
+    <input id="eExpires" type="date" value="${f.expiresAt}">
+    <div class="muted" style="margin-top:-4px">修改存储方式会自动调整默认保质期</div>
+    <label>库存阈值（剩多少提醒补货）</label>
+    <input id="eThreshold" type="number" step="0.01" value="${f.lowStockThreshold||0}">
+    <div style="display:flex;gap:8px;margin-top:18px">
+      <button class="secondary" onclick="closeModal()" style="flex:1">取消</button>
+      <button class="primary" onclick="saveFoodEdit(${id})" style="flex:2">✓ 保存修改</button>
+    </div>`);
+  // 初始化存储方式
+  document.querySelectorAll('#eStorage button').forEach(b=>{
+    if(b.dataset.s===f.storage) b.classList.add('active');
+    b.onclick = ()=>{
+      document.querySelectorAll('#eStorage button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      // 自动建议新保质期
+      const newShelf = b.dataset.s==='frozen' ? 90 : (b.dataset.s==='room' ? 30 : 7);
+      const newDate = document.getElementById('eDate').value;
+      const newExp = new Date(newDate+'T00:00:00'); newExp.setDate(newExp.getDate()+newShelf);
+      document.getElementById('eExpires').value = newExp.toISOString().slice(0,10);
+    };
+  });
+}
+
+function saveFoodEdit(id){
+  const f = db.foods.find(x=>x.id===id);
+  if(!f){ closeModal(); return; }
+  const newName = document.getElementById('eName').value.trim();
+  const newDate = document.getElementById('eDate').value;
+  const newAmount = +document.getElementById('eAmount').value;
+  const newQty = +document.getElementById('eQty').value;
+  const newUnit = document.getElementById('eUnit').value;
+  const newStorage = document.querySelector('#eStorage button.active')?.dataset.s || f.storage;
+  const newExpires = document.getElementById('eExpires').value;
+  const newThreshold = +document.getElementById('eThreshold').value;
+
+  if(!newName){ toast('请填写食材名'); return; }
+  if(newAmount<=0){ toast('请填写金额'); return; }
+  if(newQty<=0){ toast('请填写数量'); return; }
+
+  // 归一化名称
+  const norm = normalizeFoodName(newName);
+  const finalName = norm.canonical || newName;
+
+  // 单价语义：单价 = 总金额 / 原始购买量
+  // _origQty 表示"原始购买量"，qty 表示"当前剩余量"
+  // 编辑场景下用户改 qty 和 amount：
+  //   - 如果 qty 不超过 _origQty：_origQty 不变，单价 = newAmount / _origQty
+  //   - 如果 qty 超过 _origQty（库存增加了）：_origQty = qty, 单价 = newAmount / qty
+  // 剩余价值 = 单价 × qty
+  const isIncreased = newQty > (f._origQty || 0);
+  const newOrigQty = isIncreased ? newQty : (f._origQty || newQty);
+  const unitPrice = newAmount / newOrigQty;
+  const remaining = unitPrice * newQty;
+
+  // 更新字段
+  f.name = finalName;
+  f.displayName = norm.display || newName;
+  f.date = newDate;
+  f.amount = newAmount;
+  f._origQty = newOrigQty;
+  f.qty = newQty;
+  f.unit = newUnit;
+  f.remaining = remaining;
+  f.unitPrice = unitPrice; // 缓存单价（可选，方便统计）
+  f.storage = newStorage;
+  f.expiresAt = newExpires;
+  // 按新存储方式重算保质期
+  const shelf = SHELF_DB[normalize(finalName)] || shelfFor(finalName);
+  f.shelfLifeDays = newStorage==='frozen' ? Math.max(30, shelf.days) : shelf.days;
+  f.lowStockThreshold = Math.max(0, newThreshold);
+  f.batchKey = finalName+'|'+newDate;
+
+  closeModal(); save();
+  toast(`已更新：${finalName}（单价 ${money(unitPrice)}/${unitText(newUnit)}）`);
+}
+
+/* ============================================================
+   语音录入（Web Speech API）
+   ============================================================ */
+let voiceRecog=null, voiceBuf='';
+function openVoiceBuy(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    modal(`<h2>🎤 语音录入</h2>
+      <div class="empty">当前浏览器不支持语音识别<br>请使用 Chrome / Edge / Safari 14.1+</div>
+      <button class="primary" onclick="closeModal()">知道了</button>`);
+    return;
+  }
+  modal(`<h2>🎤 语音录入采购</h2>
+    <div class="muted">说出食材名称，例如：<br>"鸡胸肉 五百克 二十五元"<br>"西红柿 八个 十五块"</div>
+    <div class="voice-mic" id="voiceMic" onclick="toggleVoice()">
+      <div class="dot"></div>
+      <div class="hint" id="voiceHint">点击开始录音</div>
+    </div>
+    <div class="voice-result" id="voiceResult"><span class="muted">识别结果会出现在这里…</span></div>
+    <div id="voiceParsed"></div>
+    <div id="voiceBtns"></div>`);
+}
+function toggleVoice(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ toast('浏览器不支持语音识别'); return; }
+  if(voiceRecog){
+    try{ voiceRecog.stop(); }catch(e){}
+    voiceRecog=null;
+    document.getElementById('voiceMic').classList.remove('live');
+    document.getElementById('voiceHint').textContent='点击开始录音';
+    return;
+  }
+  voiceRecog = new SR();
+  voiceRecog.lang = 'zh-CN';
+  voiceRecog.interimResults = true;
+  voiceRecog.continuous = false;
+  voiceRecog.maxAlternatives = 3;
+  voiceBuf='';
+  voiceRecog.onresult = (e)=>{
+    let final='', interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal) final += r[0].transcript;
+      else interim += r[0].transcript;
+    }
+    const text = (voiceBuf+final+interim).trim();
+    document.getElementById('voiceResult').innerHTML = text
+      ? `<b>${text}</b>` + (interim?`<div class="alt">…识别中</div>`:'')
+      : '<span class="muted">请说话…</span>';
+    if(final){
+      voiceBuf += final;
+      const parsed = parseVoiceCommand(voiceBuf);
+      renderVoiceParsed(parsed);
+    }
+  };
+  voiceRecog.onend = ()=>{
+    voiceRecog=null;
+    document.getElementById('voiceMic').classList.remove('live');
+    document.getElementById('voiceHint').textContent='点击重新录音';
+  };
+  voiceRecog.onerror = (e)=>{
+    toast('语音识别失败：'+e.error);
+    voiceRecog=null;
+    document.getElementById('voiceMic').classList.remove('live');
+    document.getElementById('voiceHint').textContent='点击开始录音';
+  };
+  voiceRecog.start();
+  document.getElementById('voiceMic').classList.add('live');
+  document.getElementById('voiceHint').textContent='正在录音…再次点击结束';
+}
+
+// 中文数字 + 单位解析
+const CN_NUM = {'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000,'半':0.5};
+function cnNumToInt(s){
+  // 简单处理：千/百/十 组合
+  if(/^\d+(\.\d+)?$/.test(s)) return parseFloat(s);
+  // 五百克 → 500
+  const digits = s.match(/[一二两三四五六七八九十百千万半0-9]/g);
+  if(!digits) return null;
+  // 提取"五百"形式：先抓 "X百X十X"
+  let result = 0, section = 0, num = 0;
+  const map = {'零':0,'一':1,'二':2,'两':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
+  const unit = {'十':10,'百':100,'千':1000,'万':10000};
+  for(const ch of s){
+    if(ch in map){ num = map[ch]; }
+    else if(ch in unit){
+      const u = unit[ch];
+      if(num===0 && u===10) num=1; // "十"开头
+      section += num * u;
+      num = 0;
+    } else if(ch==='半'){
+      section += 0.5;
+      num = 0;
+    } else if(/\d/.test(ch)){
+      num = parseFloat(ch);
+    }
+  }
+  result = section + num;
+  if(!result) {
+    const m2 = s.match(/(\d+(\.\d+)?)/);
+    if(m2) return parseFloat(m2[1]);
+  }
+  return result || null;
+}
+
+function parseVoiceCommand(text){
+  // 目标：{name, qty, unit, amount}
+  const result = {name:'', qty:1, unit:'portion', amount:0, confidence:'low'};
+
+  // 1) 提取金额：钱/元/块/RMB
+  const amtMatch = text.match(/(\d+(\.\d+)?|\S+)\s*(元|块|块钱|钱)/);
+  if(amtMatch){
+    const amt = cnNumToInt(amtMatch[1]);
+    if(amt) result.amount = amt;
+  }
+
+  // 2) 提取数量+单位
+  const qtyPatterns = [
+    /(\d+(\.\d+)?|\S+)\s*(克|千克|公斤|斤|两|ml|毫升|升|个|只|条|根|袋|盒|份|包|颗|块|片|把)/i,
+    /(半)\s*(个|只|袋|盒|份|块|片|把)?/
+  ];
+  for(const pat of qtyPatterns){
+    const m = text.match(pat);
+    if(m){
+      if(m[1]==='半'){
+        result.qty = 0.5;
+        result.unit = unitAlias(m[2]||'份');
+      } else {
+        const q = cnNumToInt(m[1]);
+        if(q) result.qty = q;
+        // 注意："两"在 cnNumToInt 里 = 2，但 unitAlias("两") 返回 'g' 是错的
+        // 单位正则里没"两"了，所以 m[3] 一定是真单位
+        if(m[3]) result.unit = unitAlias(m[3]);
+      }
+      break;
+    }
+  }
+
+  // 3) 提取食材名：先去掉数量+单位词和金额词，剩余部分
+  // 数量词模式：数字 / 中文数字 + (量词)?  —— 注意"两"是数字(2)而非单位
+  const numUnitPattern = '(\\d+(\\.\\d+)?|[一二三四五六七八九十百千半]+)\\s*(克|千克|公斤|斤|ml|毫升|升|个|只|条|根|袋|盒|份|包|颗|块|片|把)';
+  const amountPattern = '(\\d+(\\.\\d+)?|[一二三四五六七八九十百千半]+)\\s*(元|块|块钱|钱)';
+  let name = text
+    .replace(/\s+/g,'')
+    .replace(new RegExp(amountPattern,'g'),'')
+    .replace(new RegExp(numUnitPattern,'gi'),'')
+    .replace(/半(个|只|袋|盒|份|块|片|把)?/g,'')
+    .replace(/[，。！？、,.\!?]/g,'')
+    .trim();
+  result.name = name;
+
+  // 4) 修正：如果没识别到数量但有"半"，qty 默认 0.5
+  if(!qtyPatterns.some(p=>p.test(text))){
+    if(text.includes('半')) result.qty = 0.5;
+  }
+
+  // 5) 置信度
+  const confidence = (result.name && result.qty && result.amount) ? 'high'
+                   : (result.name && (result.qty || result.amount)) ? 'medium'
+                   : 'low';
+  result.confidence = confidence;
+  return result;
+}
+function unitAlias(u){
+  const m = (u||'').toLowerCase();
+  if(/克|千克|公斤|斤|两/.test(m)) return 'g';
+  if(/毫升|升|ml|l/.test(m)) return 'ml';
+  if(/个|只|条|根|颗|片/.test(m)) return 'count';
+  if(/袋|盒|份|包|块/.test(m)) return 'portion';
+  return 'portion';
+}
+
+function renderVoiceParsed(p){
+  const box=document.getElementById('voiceParsed');
+  const btnBox=document.getElementById('voiceBtns');
+  if(!p.name){
+    box.innerHTML='<div class="muted">未能识别食材名，请重试或手动填写</div>';
+    btnBox.innerHTML='';
+    return;
+  }
+  box.innerHTML=`<div class="card" style="margin-top:12px">
+    <div class="row"><div><b>${p.name}</b> <span class="muted">置信度 ${p.confidence==='high'?'高':p.confidence==='medium'?'中':'低'}</span></div></div>
+    <div class="muted">数量 ${p.qty} ${unitText(p.unit)} · 金额 ${money(p.amount)}</div>
+  </div>`;
+  btnBox.innerHTML=`<div class="actions" style="margin-top:10px">
+    <button class="secondary" onclick="voiceRecogAgain()">🎤 重新说</button>
+    <button class="primary" onclick='confirmVoiceAdd(${JSON.stringify(p).replace(/'/g,"\\'")})'>✓ 加入库存</button>
+  </div>`;
+}
+function voiceRecogAgain(){
+  voiceBuf='';
+  document.getElementById('voiceResult').innerHTML='<span class="muted">请说话…</span>';
+  toggleVoice(); setTimeout(toggleVoice, 100);
+}
+function confirmVoiceAdd(p){
+  if(!p.name){ toast('请说出食材名'); return; }
+  // 归一化食材名（去除品牌、规格、促销词噪音，归到本质类）
+  const norm = normalizeFoodName(p.name);
+  const finalName = norm.canonical || p.name;
+  const displayName = norm.display || p.name;
+  const shelf = SHELF_DB[normalize(finalName)] || shelfFor(finalName);
+  const date = today();
+  const exp = new Date(date+'T00:00:00'); exp.setDate(exp.getDate()+shelf.days);
+  const qty = p.qty || 1;
+  const amt = p.amount || 0;
+  db.foods.push({
+    id:Date.now(), date, name:finalName, displayName, amount:amt, remaining:amt, qty, _origQty:qty,
+    unitPrice: qty>0 ? amt/qty : 0,
+    unit:p.unit||'portion', batchKey:finalName+'|'+date, storage:shelf.storage||'fridge',
+    shelfLifeDays:shelf.days, expiresAt:exp.toISOString().slice(0,10),
+    lowStockThreshold:Math.max(1, Math.round(qty*0.2))
+  });
+  closeModal(); save(); toast(`已加入：${finalName}` + (displayName!==finalName?` (原: ${displayName})`:'') + (amt?` ${money(amt)}`:''));
+}
+
+/* ============================================================
+   OCR（Tesseract.js）— 图片导入
+   ============================================================ */
+let ocrItems = [];
+let ocrRawText = '';
+function openOCRBuy(){
+  modal(`<h2>📷 拍照/小票识别</h2>
+    <div class="muted">支持超市小票、电商截图。首次加载约需 15MB 中文 OCR 模型，请稍候。</div>
+    <label class="ocr-zone" for="ocrFile">
+      <div>📷 点击上传图片 / 拍照</div>
+      <input id="ocrFile" type="file" accept="image/*" capture="environment" style="display:none">
+      <img id="ocrPreview" style="display:none">
+    </label>
+    <div id="ocrStatus" class="ocr-progress"></div>
+    <div id="ocrList"></div>
+    <div id="ocrBtns"></div>`);
+  document.getElementById('ocrFile').onchange = onOCRFileChange;
+}
+async function onOCRFileChange(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    const img = document.getElementById('ocrPreview');
+    img.src = ev.target.result;
+    img.style.display='block';
+  };
+  reader.readAsDataURL(file);
+  runOCR(file);
+}
+async function runOCR(file){
+  const status = document.getElementById('ocrStatus');
+  const list = document.getElementById('ocrList');
+  const btnBox = document.getElementById('ocrBtns');
+  status.textContent='⏳ 加载 OCR 引擎…';
+  list.innerHTML=''; btnBox.innerHTML=''; ocrItems=[]; ocrRawText='';
+
+  if(!window.Tesseract){
+    // 动态注入 CDN
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+      s.onload=res; s.onerror=rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  try{
+    status.textContent='⏳ 识别中…（首次需要下载中文模型，请耐心等待 10-30 秒）';
+    const worker = await Tesseract.createWorker('chi_sim', 1, {
+      logger: m=>{
+        if(m.status==='recognizing text'){
+          status.textContent=`⏳ 识别中… ${(m.progress*100).toFixed(0)}%`;
+        } else if(m.status){
+          status.textContent=`⏳ ${m.status}…`;
+        }
+      }
+    });
+    const { data } = await worker.recognize(file);
+    await worker.terminate();
+    status.textContent=`✅ 识别完成，共 ${data.text.length} 字符`;
+    ocrRawText = data.text;
+    ocrItems = parseOCRText(data.text);
+    renderOCRItems();
+  }catch(err){
+    status.innerHTML=`<span style="color:var(--danger)">❌ 识别失败：${err.message||err}</span>`;
+  }
+}
+
+// 小票文本 → (商品名, 单价, 数量) 列表
+// 策略：
+//  1) 同行匹配：商品名 ... ¥价格（最理想）
+//  2) 相邻行配对：商品名行 + 下一行只有价格，配成一项（电商常见）
+//  3) 跳过：合计/实付款/总计/应付/找零/支付/优惠/折扣/快递/邮费/单号/时间/店名/收银员/会员/积分/日期/谢谢/欢迎/TOTAL/Subtotal 等
+function parseOCRText(text){
+  const items = [];
+  const rawLines = text.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+
+  const priceRe = /(\d+\.\d{1,2})\s*[元¥]?$/;
+  const priceOnlyRe = /^[¥￥]?\s*(\d+\.\d{1,2})\s*[元¥]?\s*$/;
+  const qtyRe = /[xX*×]\s*(\d+)|(\d+)\s*[xX*×]/;
+  const skipWords = /(合计|小计|总计|应收|应付|实付|已付|实付款|总价|线上付|找零|支付|优惠|折扣|减免|邮费|运费|包邮|包退|单号|订单号|快递|物流|时间|收银员|会员|积分|日期|谢谢|欢迎|TOTAL|Subtotal|查看|评价|购物车|更多|交易|成功)/i;
+  // 含中文且≥3 字、长度≤40 → 可能是商品名
+  // 去空格后再判断（OCR 经常字间加空格导致含 skip 词的字串被拆开，如"实 付 款 Y"）
+  const collapse = s => (s||'').replace(/\s+/g,'');
+  const looksLikeName = s => /[\u4e00-\u9fa5]/.test(s) && s.length>=3 && s.length<=40 && !skipWords.test(collapse(s));
+  // 价格行：单纯 ¥x.xx 或 x.xx
+  const looksLikePrice = s => priceOnlyRe.test(s);
+
+  for(let i=0;i<rawLines.length;i++){
+    const line = rawLines[i];
+    if(skipWords.test(collapse(line))) continue;
+    if(line.length<2 || line.length>50) continue;
+
+    // 模式 1：同行匹配
+    const pm = line.match(priceRe);
+    if(pm){
+      const price = parseFloat(pm[1]);
+      if(price<=0 || price>9999) continue;
+      const namePart = line.substring(0, pm.index).trim();
+      let name = namePart.replace(qtyRe,'').replace(/[xX*×]/g,'').replace(/^[\d\s\-\/]+/,'').trim();
+      if(!looksLikeName(name)) continue;
+      let qty = 1;
+      const qm = namePart.match(qtyRe);
+      if(qm){ qty = parseFloat(qm[1]||qm[2]) || 1; }
+      items.push({name, price, qty, unit:'portion', keep:true});
+      continue;
+    }
+
+    // 模式 2：商品名行 + 后续 1-N 行（规格/数量/价格）
+    if(looksLikeName(line)){
+      // 提取商品名中的 xN/数量标记
+      let qty = 1;
+      const qm = line.match(qtyRe);
+      if(qm){ qty = parseFloat(qm[1]||qm[2]) || 1; }
+      // 商品名清理
+      let name = line.replace(/[xX*×]\s*\d+\s*$/,'').replace(/^[\d\s\-\/]+/,'').trim();
+      // 临时 unit（从后续规格行推断）
+      let unit = null;
+      let price = null;
+      // 先缓存后面 5 行，分类（规格 / 价格 / 数量 / 描述）
+      const candidates = [];
+      for(let j=i+1;j<=Math.min(i+5, rawLines.length-1);j++){
+        const next = rawLines[j];
+        if(skipWords.test(collapse(next))) break;
+        // 价格行
+        if(!price){
+          const np = next.match(priceOnlyRe);
+          if(np){ price = parseFloat(np[1]); continue; }
+        }
+        // 规格行（数字+单位）
+        if(!unit){
+          const specMatch = next.match(/(\d+\.?\d*)\s*(g|kg|ml|l|斤|两)\b/i);
+          if(specMatch){
+            const specQty = parseFloat(specMatch[1]);
+            const specU = specMatch[2].toLowerCase();
+            if(specU==='kg' || specU==='千克'){ unit='g'; qty = specQty*1000; }
+            else if(specU==='l' || specU==='升'){ unit='ml'; qty = specQty*1000; }
+            else if(specU==='两'){ unit='g'; qty = specQty*50; }
+            else if(specU==='斤'){ unit='g'; qty = specQty*500; }
+            else { unit = specU==='千克'?'g':(specU==='毫升'?'ml':specU); qty = specQty; }
+            continue;
+          }
+        }
+        // 数量行 xN / ×N / Nx
+        if(qty===1){
+          const xMatch = next.match(/^[xX*×]\s*(\d+)$/) || next.match(/^(\d+)\s*[xX*×]$/);
+          if(xMatch){ qty = parseFloat(xMatch[1]) || 1; continue; }
+        }
+        // 含中文描述行（"纯可可味"、"原味"、"袋装/1件"等）—跳过
+        if(/[\u4e00-\u9fa5]/.test(next)) continue;
+        // 其他行：跳过
+      }
+      if(price===null || price<=0 || price>9999) continue;
+      if(!unit){
+        const norm = normalizeFoodName(name);
+        unit = defaultUnit(norm.canonical || name);
+      }
+      items.push({name, price, qty, unit, keep:true});
+    }
+  }
+
+  // 去重（同名累加）
+  const merged = new Map();
+  for(const it of items){
+    if(merged.has(it.name)){
+      const m=merged.get(it.name);
+      m.qty += it.qty;
+      m.price = Math.max(m.price, it.price);
+    } else merged.set(it.name, {...it});
+  }
+  return [...merged.values()];
+}
+
+function renderOCRItems(){
+  const list = document.getElementById('ocrList');
+  const btnBox = document.getElementById('ocrBtns');
+  // OCR 原文折叠区
+  const rawBox = ocrRawText
+    ? `<details style="margin-top:10px;font-size:12px"><summary style="cursor:pointer;color:var(--muted)">🔍 查看 OCR 识别原文（${ocrRawText.length} 字符）</summary>
+       <pre style="background:#f5f3ed;padding:8px;border-radius:6px;margin-top:6px;white-space:pre-wrap;word-break:break-all;font-size:11px;max-height:200px;overflow:auto">${escapeAttr(ocrRawText)}</pre></details>`
+    : '';
+
+  if(!ocrItems.length){
+    list.innerHTML=`<div class="empty">未能从图片中提取商品条目<br><span class="muted">可以手动添加，或重新拍更清晰的图片</span></div>
+      ${rawBox}`;
+    btnBox.innerHTML=`<div class="actions">
+      <button class="secondary" onclick="addBlankOCRRow()">＋ 手动添加一行</button>
+      <button class="primary" onclick="confirmOCRAdd()">✓ 加入库存</button>
+    </div>`;
+    return;
+  }
+  list.innerHTML = `<div class="ocr-list">${ocrItems.map((it,i)=>{
+    // 实时显示归一名（小灰字），让用户看清"实际是什么食材"
+    const norm = normalizeFoodName(it.name);
+    const canonical = norm.canonical || it.name;
+    const showCanonical = canonical !== it.name;
+    return `
+    <div class="ocr-row">
+      <input class="col-name" type="text" value="${escapeAttr(canonical)}" data-i="${i}" data-k="name">
+      ${showCanonical ? `<div class="ocr-name-original" style="flex-basis:100%">原: ${escapeAttr(it.name)}</div>` : ''}
+      <input class="col-qty" type="number" step="0.01" value="${it.qty}" data-i="${i}" data-k="qty">
+      <select class="col-unit" data-i="${i}" data-k="unit">
+        ${['g','ml','count','portion'].map(u=>`<option value="${u}" ${u===it.unit?'selected':''}>${unitText(u)}</option>`).join('')}
+      </select>
+      <input class="col-price" type="number" step="0.01" value="${it.price}" data-i="${i}" data-k="price">
+      <button class="col-del" data-i="${i}" data-k="del">×</button>
+    </div>`;
+  }).join('')}</div>
+    <div class="muted" style="margin-top:8px">💡 名称已自动归一（如"COLACAO 可可粉"→可可粉）；想看原名看下方小字；识别错的直接修改</div>
+    ${rawBox}`;
+  btnBox.innerHTML=`<div class="actions" style="margin-top:14px">
+    <button class="secondary" onclick="addBlankOCRRow()">＋ 手动添加</button>
+    <button class="secondary" onclick="closeModal()">取消</button>
+    <button class="primary" onclick="confirmOCRAdd()">✓ 批量加入库存（${ocrItems.length} 项）</button>
+  </div>`;
+  list.querySelectorAll('input,select').forEach(el=>{
+    el.addEventListener('input', e=>{
+      const i=+el.dataset.i, k=el.dataset.k;
+      if(k==='del') return;
+      const v = (k==='qty'||k==='price') ? parseFloat(el.value)||0 : el.value;
+      ocrItems[i][k]=v;
+    });
+  });
+  list.querySelectorAll('button[data-k=del]').forEach(b=>{
+    b.onclick=()=>{ const i=+b.dataset.i; ocrItems.splice(i,1); renderOCRItems(); };
+  });
+}
+function addBlankOCRRow(){
+  ocrItems.push({name:'', price:0, qty:1, unit:'portion', keep:true});
+  renderOCRItems();
+}
+function confirmOCRAdd(){
+  const items = ocrItems.filter(x=>x.keep && x.name);
+  if(!items.length){ toast('没有可添加的项'); return; }
+  const date = today();
+  let added = 0;
+  for(const it of items){
+    // 归一化食材名（去除品牌、规格、促销词，归到本质类）
+    const norm = normalizeFoodName(it.name);
+    const finalName = norm.canonical || it.name;
+    const displayName = norm.display || it.name;
+    const qty = it.qty||1;
+    // OCR 解析出的 price 始终是总价（金额）；amount 直接用 price
+    const amt = it.price || 0;
+    // 同日同名 → 合并（同 addFood 逻辑）
+    const existing = db.foods.find(f=>f.name===finalName && f.date===date);
+    if(existing){
+      const oldUnitPrice = existing.amount / existing._origQty;
+      existing._origQty += qty;
+      existing.qty += qty;
+      existing.amount += amt;
+      existing.remaining = oldUnitPrice * existing.qty;
+      existing.unitPrice = existing.amount / existing._origQty;
+      added++;
+      continue;
+    }
+    const shelf = SHELF_DB[normalize(finalName)] || shelfFor(finalName);
+    const exp = new Date(date+'T00:00:00'); exp.setDate(exp.getDate()+shelf.days);
+    db.foods.push({
+      id:Date.now()+added, date, name:finalName, displayName, amount:amt, remaining:amt, qty, _origQty:qty,
+      unitPrice: qty>0 ? amt/qty : 0,
+      unit:it.unit||'portion', batchKey:finalName+'|'+date, storage:shelf.storage||'fridge',
+      shelfLifeDays:shelf.days, expiresAt:exp.toISOString().slice(0,10),
+      lowStockThreshold:Math.max(1, Math.round(qty*0.2))
+    });
+    added++;
+  }
+  closeModal(); save(); toast(`已加入 ${added} 项`);
+}
+
+/* ============================================================
+   过期/补货提醒
+   ============================================================ */
+function computeReminders(foods){
+  foods = foods || db.foods;
+  const todayStr = today();
+  const reminders = {expired:[], expiring:[], lowStock:[]};
+
+  foods.forEach(f=>{
+    if(f.remaining <= 0.001) return;
+    const daysLeft = daysBetween(todayStr, f.expiresAt);
+    if(daysLeft < 0){
+      reminders.expired.push({food:f, days:-daysLeft});
+    } else if(daysLeft <= 3){
+      reminders.expiring.push({food:f, days:daysLeft});
+    }
+    if(f.qty <= (f.lowStockThreshold||0)){
+      reminders.lowStock.push({food:f, qty:f.qty});
+    }
+  });
+
+  // 去重（同一食材取最早过期或最低余量）
+  const uniq = (arr, key)=>{
+    const map = new Map();
+    for(const item of arr){
+      const k = key(item);
+      if(!map.has(k) || item.food.expiresAt < map.get(k).food.expiresAt){
+        map.set(k, item);
+      }
+    }
+    return [...map.values()];
+  };
+  reminders.expiring = uniq(reminders.expiring, x=>x.food.name).sort((a,b)=>a.days-b.days);
+  reminders.expired = uniq(reminders.expired, x=>x.food.name).sort((a,b)=>b.days-a.days);
+  reminders.lowStock = uniq(reminders.lowStock, x=>x.food.name);
+
+  return reminders;
+}
+function renderAlertBar(){
+  const r = computeReminders();
+  const total = r.expired.length + r.expiring.length + r.lowStock.length;
+  const bar = document.getElementById('alertBar');
+  if(!total){ bar.innerHTML=''; return; }
+  const expiredNote = r.expired.length ? `${r.expired.length} 项已过期` : '';
+  const expiringNote = r.expiring.length ? `${r.expiring.length} 项即将过期` : '';
+  const lowNote = r.lowStock.length ? `${r.lowStock.length} 项库存偏低` : '';
+  const isUrgent = r.expired.length > 0;
+  bar.innerHTML = `<div class="alert-bar ${isUrgent?'urgent':''}" onclick="showAllReminders()">
+    <div><b>${isUrgent?'⚠ ':'🔔 '}</b>${[expiredNote,expiringNote,lowNote].filter(Boolean).join(' · ')}</div>
+    <button>查看</button>
+  </div>`;
+}
+function showAllReminders(){
+  const r = computeReminders();
+  let html = `<h2>🔔 提醒</h2>`;
+  if(r.expired.length){
+    html += `<div class="section-title" style="color:var(--urgent)">⚠ 已过期</div>`;
+    html += r.expired.map(({food,days})=>`<div class="card expired">
+      <div class="row"><div><b>${food.name}</b> <span class="muted">过期 ${days} 天</span><br>
+      <span class="muted">${food.qty||0}${unitText(food.unit)} · 购于 ${food.date}</span></div>
+      <button class="danger" onclick="delFood(${food.id});showAllReminders()">删除</button></div></div>`).join('');
+  }
+  if(r.expiring.length){
+    html += `<div class="section-title" style="color:var(--warn)">⏳ 即将过期</div>`;
+    html += r.expiring.map(({food,days})=>`<div class="card expire-soon">
+      <div class="row"><div><b>${food.name}</b> <span class="muted">${days===0?'今天到期':`还有 ${days} 天`}</span><br>
+      <span class="muted">${food.qty||0}${unitText(food.unit)} · 购于 ${food.date}</span></div>
+      <button class="ghost" onclick="openCook()">去消耗</button></div></div>`).join('');
+  }
+  if(r.lowStock.length){
+    html += `<div class="section-title">📦 库存偏低（建议补货）</div>`;
+    html += r.lowStock.map(({food})=>`<div class="card">
+      <div class="row"><div><b>${food.name}</b> <span class="muted">剩 ${food.qty||0}${unitText(food.unit)}</span><br>
+      <span class="muted">阈值 ${food.lowStockThreshold||0}${unitText(food.unit)}</span></div>
+      <button class="ghost" onclick="quickReBuy('${food.name.replace(/'/g,"\\'")}')">补货</button></div></div>`).join('');
+  }
+  html += `<button class="primary" style="margin-top:14px" onclick="closeModal()">知道了</button>`;
+  modal(html);
+}
+function quickReBuy(name){
+  // 复用 openBuy，预填名字
+  openBuy();
+  setTimeout(()=>{
+    const n=document.getElementById('bName');
+    if(n){ n.value=name; onBuyNameInput(); }
+  },50);
+}
+
+/* ============================================================
+   浏览器通知（首次进入请求权限）
+   ============================================================ */
+let notifAsked = false;
+function ensureNotifPermission(){
+  if(notifAsked) return;
+  notifAsked = true;
+  if('Notification' in window && Notification.permission==='default'){
+    // 不弹请求框，等用户点击"开启通知"再请
+  }
+}
+function requestNotif(){
+  if(!('Notification' in window)){ toast('浏览器不支持通知'); return; }
+  Notification.requestPermission().then(p=>{
+    if(p==='granted'){
+      toast('通知已开启，过期食材会自动提醒');
+      runNotifCheck();
+    } else {
+      toast('未授权，仍可在 App 内查看提醒');
+    }
+  });
+}
+function runNotifCheck(){
+  const r = computeReminders();
+  const items = [...r.expired.map(x=>({...x, urgent:true})), ...r.expiring];
+  if(!items.length) return;
+  const last = db._lastNotifKey;
+  const key = items.map(x=>`${x.food.id}:${x.days}`).join('|');
+  if(last===key) return;
+  db._lastNotifKey = key;
+  save();
+  if(Notification.permission==='granted'){
+    new Notification('伙食费提醒', {
+      body: items.slice(0,3).map(x=>x.food.name+(x.urgent?` 过期${x.days}天`:` ${x.days}天后到期`)).join('，'),
+      icon:'🍅'
+    });
+  }
+}
+
+/* ============================================================
+   周统计
+   ============================================================ */
+let weekOffset = 0;
+function getWeekRange(offset=0){
+  const now = new Date();
+  const day = now.getDay();
+  const mondayOffset = day===0 ? -6 : 1-day;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() + mondayOffset + offset*7);
+  const sun = new Date(mon); sun.setDate(mon.getDate()+6);
+  const fmt = d => d.toISOString().slice(0,10);
+  const label = `${mon.getMonth()+1}/${mon.getDate()} – ${sun.getMonth()+1}/${sun.getDate()}`;
+  return {start:fmt(mon), end:fmt(sun), label};
+}
+function shiftWeek(d){ weekOffset += d; render(); }
+function renderWeek(){
+  const {start,end,label} = getWeekRange(weekOffset);
+  document.getElementById('weekRange').textContent = weekOffset===0 ? `本周（${label}）` : label;
+  const days=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(start+'T00:00:00'); d.setDate(d.getDate()+i);
+    days.push(d.toISOString().slice(0,10));
+  }
+  const card = document.getElementById('weekCard');
+  const dayRows = days.map(d=>{
+    const outs = db.outside.filter(x=>x.date===d);
+    const meals = db.meals.filter(x=>x.date===d);
+    const tot = outs.reduce((s,x)=>s+x.amount,0) + meals.reduce((s,x)=>s+x.total,0);
+    const dayLabel = new Date(d+'T00:00:00').toLocaleDateString('zh-CN',{month:'numeric',day:'numeric',weekday:'short'});
+    const detailId = 'detail-'+d;
+    const itemsHtml = [
+      ...outs.map(o=>`<div class="item"><span>🍜 ${o.meal}${o.note?' · '+o.note:''}</span><span>${money(o.amount)}</span></div>`).join(''),
+      ...meals.map(m=>`<div class="item"><span>🥬 ${m.meal} · ${m.items.map(i=>i.name).join('、')}</span><span>${money(m.total)}</span></div>`).join('')
+    ].join('') || '<div class="muted" style="padding:6px 0">无记录</div>';
+    return `<div class="day-row" onclick="toggleDay('${detailId}',this)">
+      <div class="row"><div><b>${dayLabel}</b></div><b>${money(tot)}</b></div>
+      <div class="day-detail" id="${detailId}">${itemsHtml}</div>
+    </div>`;
+  }).join('');
+  const weekTotal = days.reduce((s,d)=>{
+    return s + db.outside.filter(x=>x.date===d).reduce((a,x)=>a+x.amount,0)
+              + db.meals.filter(x=>x.date===d).reduce((a,x)=>a+x.total,0);
+  }, 0);
+  card.innerHTML = `<div class="row" style="margin-bottom:8px"><span class="muted">本周合计</span><b style="font-size:18px">${money(weekTotal)}</b></div>${dayRows}`;
+}
+function toggleDay(id, row){
+  document.getElementById(id).classList.toggle('open');
+}
+
+/* ============================================================
+   主渲染
+   ============================================================ */
+
+// 食材分类映射（按归一后的 canonical 名称归到 5 大类）
+const CATEGORY_MAP = {
+  '蔬菜':['白菜','菠菜','生菜','番茄','土豆','洋葱','胡萝卜','黄瓜','茄子','青椒','辣椒','花菜','蘑菇','香菇','豆制品','豆腐'],
+  '肉禽蛋':['鸡蛋','鸡胸肉','鸡腿','鸡翅','鸡爪','鸡肉','排骨','五花肉','里脊肉','梅花肉','猪蹄','猪肝','猪肉','牛排','牛腩','牛腱','牛尾','牛筋','牛肋条','五花趾','肥牛','牛肉','羊肉'],
+  '水产海鲜':['鱼','虾','螃蟹','贝类','海鲜'],
+  '水果':['苹果','香蕉','橙子','葡萄','草莓','蓝莓','西瓜','桃子','梨','芒果','柠檬'],
+  '乳品':['牛奶','酸奶','奶粉','奶酪','黄油','奶油'],
+  '米面粮油':['大米','面条','面包','面食','食用油','酱油','醋','糖','盐'],
+  '调料':['味精','料酒','蚝油','调味酱'],
+  '冲饮零食':['可可粉','巧克力','咖啡','茶饮','燕麦冲饮','面粉','烘焙原料','零食','坚果','糖果','果干','汽水','矿泉水','啤酒','果汁'],
+};
+function getCategory(canonical){
+  for(const cat in CATEGORY_MAP){
+    if(CATEGORY_MAP[cat].includes(canonical)) return cat;
+  }
+  return '其他';
+}
+// 调色板：8 类，每类一个色
+const CAT_COLORS = {
+  '蔬菜':'#7cb86c','肉禽蛋':'#d97757','水产海鲜':'#5b9bd5','水果':'#e8a87c',
+  '乳品':'#f0e68c','米面粮油':'#c19a6b','调料':'#9b8fe0','冲饮零食':'#e57b9e','其他':'#aaa'
+};
+
+// 库存视图状态
+let inventoryView = 'expire'; // 'expire' | 'category'
+
+function renderInventoryStats(){
+  const box = document.getElementById('inventoryStats');
+  if(!box) return;
+  const items = db.foods.filter(f=>f.remaining>0.001);
+  if(!items.length){ box.innerHTML=''; return; }
+
+  // 1) 按分类聚合：剩余价值、数量、项数
+  const catAgg = {}; // cat -> { value, count, qty }
+  items.forEach(f=>{
+    const cat = getCategory(f.name);
+    if(!catAgg[cat]) catAgg[cat] = {value:0, count:0, qty:0};
+    catAgg[cat].value += f.remaining||0;
+    catAgg[cat].count += 1;
+    catAgg[cat].qty += f.qty||0;
+  });
+  const totalValue = Object.values(catAgg).reduce((s,x)=>s+x.value, 0);
+  const totalCount = items.length;
+
+  // 2) 按过期时间分桶（基于剩余价值）
+  const todayStr = today();
+  const buckets = [
+    {label:'已过期', max:-1, value:0, items:[], color:'#b85c52'},
+    {label:'今天', max:0, value:0, items:[], color:'#d97757'},
+    {label:'1-2天', max:2, value:0, items:[], color:'#e8a87c'},
+    {label:'3-7天', max:7, value:0, items:[], color:'#f0c674'},
+    {label:'>7天', max:9999, value:0, items:[], color:'#7cb86c'},
+  ];
+  items.forEach(f=>{
+    const d = daysBetween(todayStr, f.expiresAt);
+    if(d<0){ buckets[0].value += f.remaining; buckets[0].items.push(f); }
+    else if(d===0){ buckets[1].value += f.remaining; buckets[1].items.push(f); }
+    else if(d<=2){ buckets[2].value += f.remaining; buckets[2].items.push(f); }
+    else if(d<=7){ buckets[3].value += f.remaining; buckets[3].items.push(f); }
+    else { buckets[4].value += f.remaining; buckets[4].items.push(f); }
+  });
+  const totalExpiryValue = buckets.reduce((s,b)=>s+b.value, 0);
+
+  // 3) 补货优先级：即将过期（≤3天）且库存低于阈值
+  const priority = items.filter(f=>{
+    const d = daysBetween(todayStr, f.expiresAt);
+    return d >= 0 && d <= 3 && f.qty <= (f.lowStockThreshold||0) * 2;
+  }).sort((a,b)=>daysBetween(todayStr, a.expiresAt) - daysBetween(todayStr, b.expiresAt)).slice(0,5);
+
+  // 渲染
+  // 饼图（按分类价值）
+  const cats = Object.entries(catAgg).sort((a,b)=>b[1].value - a[1].value);
+  const pieSegments = renderPieSegments(cats, totalValue);
+
+  let html = '';
+
+  // 卡片 1：库存总览 + 分类饼图
+  html += `<div class="viz-card">
+    <div class="viz-title">📊 库存分布（按分类）</div>
+    <div class="viz-total">共 ${totalCount} 项，总价值 ${money(totalValue)}</div>
+    <svg class="viz-pie" viewBox="-50 -50 100 100">${pieSegments}</svg>
+    <div class="viz-legend">${cats.map(([cat,v])=>{
+      const pct = totalValue>0 ? (v.value/totalValue*100).toFixed(0) : 0;
+      return `<div class="viz-legend-item"><div class="viz-swatch" style="background:${CAT_COLORS[cat]||'#aaa'}"></div>${cat} ${money(v.value)} (${pct}%) · ${v.count}项</div>`;
+    }).join('')}</div>
+  </div>`;
+
+  // 卡片 2：过期时间轴
+  if(totalExpiryValue > 0){
+    html += `<div class="viz-card">
+      <div class="viz-title">⏳ 过期分布（按剩余价值）</div>
+      <div class="viz-timeline">
+        <div class="viz-timeline-bar">${buckets.map(b=>{
+          if(totalExpiryValue<=0 || b.value<=0) return '';
+          const pct = (b.value/totalExpiryValue*100);
+          return `<div class="viz-timeline-seg" style="flex:${pct};background:${b.color}" title="${b.label}: ${money(b.value)} (${b.items.length}项)">${pct>=8?b.items.length:''}</div>`;
+        }).join('')}</div>
+        <div class="viz-timeline-labels">
+          ${buckets.map(b=>b.value>0?`<span>${b.label}</span>`:`<span style="opacity:.3">${b.label}</span>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // 卡片 3：补货优先级
+  if(priority.length){
+    html += `<div class="viz-card">
+      <div class="viz-title">⚡ 优先消耗（即将过期 + 库存低）</div>
+      ${priority.map(f=>{
+        const d = daysBetween(todayStr, f.expiresAt);
+        const dayTxt = d===0?'今天到期':`${d}天后到期`;
+        return `<div class="viz-priority-row">
+          <div class="viz-priority-name">${f.name}</div>
+          <div class="viz-priority-meta">${dayTxt} · 剩 ${f.qty||0}${unitText(f.unit)}</div>
+          <button class="ghost" onclick="openCook()">做饭</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  box.innerHTML = html;
+}
+
+// 饼图分段（SVG path），返回多段 path 字符串
+function renderPieSegments(cats, totalValue){
+  if(totalValue<=0 || cats.length===0) return '';
+  const r = 42, cx = 0, cy = 0;
+  let acc = 0;
+  return cats.map(([cat, v], idx)=>{
+    const pct = v.value / totalValue;
+    if(pct<=0.001) return '';
+    const startAngle = acc * 2 * Math.PI - Math.PI/2;
+    acc += pct;
+    const endAngle = acc * 2 * Math.PI - Math.PI/2;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const largeArc = pct > 0.5 ? 1 : 0;
+    const path = `M ${cx} ${cy} L ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} Z`;
+    const color = CAT_COLORS[cat] || '#aaa';
+    return `<path d="${path}" fill="${color}" stroke="#fff" stroke-width="1"><title>${cat}: ${money(v.value)}</title></path>`;
+  }).join('');
+}
+
+function switchInventoryView(view){
+  inventoryView = view;
+  document.querySelectorAll('#viewTabs button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.view===view);
+  });
+  render();
+}
+
+function renderFoodCard(f, allNames, todayStr, opts={}){
+  const similar = allNames.filter(n=>n!==f.name && similarity(n,f.name)>=0.6);
+  const expDays = daysBetween(todayStr, f.expiresAt);
+  let extra='';
+  let rowCls = similar.length ? 'similar-row' : '';
+  if(expDays<0){ extra=`<div class="muted" style="color:var(--urgent)">⚠ 已过期 ${-expDays} 天</div>`; rowCls='expired'; }
+  else if(expDays<=3){
+    const dayTxt = expDays===0 ? '今天到期' : `${expDays}天后到期`;
+    extra=`<div class="muted" style="color:var(--warn)">⏳ ${dayTxt}</div>`;
+    rowCls = rowCls ? rowCls : 'expire-soon';
+  }
+  return `<div class="card ${rowCls.trim()}"><div class="row"><div>
+    <b>${f.name}</b><span class="shelf-pill ${f.storage||'fridge'}">${({fridge:'🧊冷藏',frozen:'❄冷冻',room:'🌡常温'})[f.storage||'fridge']}</span>
+    ${f.displayName && f.displayName!==f.name ? `<div class="muted">原: ${f.displayName}</div>` : ''}
+    ${similar.length?`<div class="muted" style="color:var(--warn)">⚠ 与「${similar[0]}」相似，可能需合并</div>`:''}
+    <div class="muted">购于 ${f.date} · 原价 ${money(f.amount)}</div>
+    <div class="muted">${f.qty||0}${unitText(f.unit)} · 保质期 ${f.shelfLifeDays||7}天${f.unitPrice?` · 单价 ${money(f.unitPrice)}/${unitText(f.unit)}`:''}</div>
+    ${extra}
+    </div><div style="text-align:right"><b>${money(f.remaining)}</b><div class="muted">剩余</div>
+    <div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end">
+      <button class="ghost" onclick="editFood(${f.id})">编辑</button>
+      <button class="danger" onclick="delFood(${f.id})">删除</button>
+    </div></div></div></div>`;
+}
+
+function renderInventoryList(inv, allNames, todayStr){
+  const box = document.getElementById('inventoryList');
+  if(!inv.length){ box.innerHTML='<div class="empty">库存为空</div>'; return; }
+  if(inventoryView==='category'){
+    // 按分类分组
+    const groups = {};
+    inv.forEach(f=>{
+      const cat = getCategory(f.name);
+      if(!groups[cat]) groups[cat] = [];
+      groups[cat].push(f);
+    });
+    const sortedCats = Object.keys(groups).sort((a,b)=>groups[b].reduce((s,f)=>s+f.remaining,0) - groups[a].reduce((s,f)=>s+f.remaining,0));
+    box.innerHTML = sortedCats.map(cat=>{
+      const items = groups[cat].sort((a,b)=>daysBetween(todayStr,a.expiresAt) - daysBetween(todayStr,b.expiresAt));
+      const catValue = items.reduce((s,f)=>s+f.remaining,0);
+      return `<div class="viz-cat-group">
+        <div class="viz-cat-group-title" style="color:${CAT_COLORS[cat]}">${cat}（${items.length}项 · ${money(catValue)}）</div>
+        ${items.map(f=>renderFoodCard(f, allNames, todayStr)).join('')}
+      </div>`;
+    }).join('');
+  } else {
+    // 按过期时间排序（默认）
+    const sorted = inv.slice().sort((a,b)=>daysBetween(todayStr,a.expiresAt) - daysBetween(todayStr,b.expiresAt));
+    box.innerHTML = sorted.map(f=>renderFoodCard(f, allNames, todayStr)).join('');
+  }
+}
+
+function render(){
+  // 提醒条
+  renderAlertBar();
+
+  const d=today();
+  const outs=db.outside.filter(x=>x.date===d);
+  const meals=db.meals.filter(x=>x.date===d);
+  const oc=outs.reduce((s,x)=>s+x.amount,0);
+  const mc=meals.reduce((s,x)=>s+x.total,0);
+  document.getElementById('todayTotal').textContent=money(oc+mc);
+  document.getElementById('todayOutside').textContent=oc.toFixed(2);
+  document.getElementById('todayCook').textContent=mc.toFixed(2);
+
+  const list=[
+    ...outs.map(x=>({kind:'outside', id:x.id, t:x.meal, n:x.note||'外食', a:x.amount})),
+    ...meals.map(x=>({kind:'meal', id:x.id, t:x.meal, n:x.items.map(i=>i.name).join('、'), a:x.total}))
+  ];
+  document.getElementById('todayList').innerHTML = list.length
+    ? list.map(x=>`<div class="card"><div class="row"><div><b>${x.t}</b><div class="muted">${x.n}</div></div>
+        <div class="edit-row"><b>${money(x.a)}</b>
+          <button class="ghost" onclick="${x.kind==='outside'?`openOutside(${x.id})`:`openMealEdit(${x.id})`}">编辑</button>
+          <button class="danger" onclick="${x.kind==='outside'?`delOutside(${x.id})`:`delMeal(${x.id})`}">×</button>
+        </div></div></div>`).join('')
+    : '<div class="empty">今天还没有伙食费记录</div>';
+
+  // 库存按"最早过期"升序：先过期排顶，帮助优先消耗临期食材
+  const inv=db.foods.filter(f=>f.remaining>0.001).slice().sort((a,b)=>a.expiresAt.localeCompare(b.expiresAt));
+  const allNames=[...new Set(db.foods.map(f=>f.name))];
+  const todayStr = today();
+
+  document.getElementById('recentFood').innerHTML = inv.slice(0,4).map(f=>{
+    const similar = allNames.filter(n=>n!==f.name && similarity(n,f.name)>=0.6);
+    const expDays = daysBetween(todayStr, f.expiresAt);
+    let expireNote = '';
+    let rowCls = '';
+    if(expDays < 0){ expireNote = `<span class="muted" style="color:var(--urgent)">⚠ 已过期 ${-expDays} 天</span>`; rowCls='expired'; }
+    else if(expDays <= 3){
+      const dayTxt = expDays===0 ? '今天到期' : `${expDays}天后到期`;
+      expireNote = `<span class="muted" style="color:var(--warn)">⏳ ${dayTxt}</span>`;
+      rowCls='expire-soon';
+    }
+    return `<div class="card ${rowCls}"><div class="row"><div>
+      <b>${f.name}</b><span class="shelf-pill ${f.storage||'fridge'}">${({fridge:'🧊冷藏',frozen:'❄冷冻',room:'🌡常温'})[f.storage||'fridge']}</span>
+      ${similar.length?`<div class="muted" style="color:var(--warn)">⚠ 与「${similar[0]}」相似</div>`:''}
+      <div class="muted">${f.qty||0}${unitText(f.unit)} · ${f.date}</div>
+      ${expireNote?`<div>${expireNote}</div>`:''}
+      </div><div><b>${money(f.remaining)}</b><div class="muted">剩余价值</div></div></div></div>`;
+  }).join('') || '<div class="empty">还没有采购记录</div>';
+
+  renderInventoryList(inv, allNames, todayStr);
+  renderInventoryStats();
+
+  const all=[
+    ...db.outside.map(x=>({date:x.date, type:'外食', meal:x.meal, note:x.note||'外食', amount:x.amount, kind:'outside', id:x.id})),
+    ...db.meals.map(x=>({date:x.date, type:'做饭', meal:x.meal, note:x.items.map(i=>i.name).join('、'), amount:x.total, kind:'meal', id:x.id}))
+  ].sort((a,b)=>b.date.localeCompare(a.date) || b.id-a.id);
+  document.getElementById('recordsList').innerHTML = all.length
+    ? all.map(x=>`<div class="card"><div class="row"><div>
+        <span class="tag">${x.type}</span> <b>${x.meal}</b>
+        <div class="muted">${x.date} · ${x.note}</div>
+        </div>
+        <div class="edit-row"><b>${money(x.amount)}</b>
+          <button class="ghost" onclick="${x.kind==='outside'?`openOutside(${x.id})`:`openMealEdit(${x.id})`}">编辑</button>
+        </div></div></div>`).join('')
+    : '<div class="empty">暂无记录</div>';
+
+  const ym=d.slice(0,7);
+  const mo=db.outside.filter(x=>x.date.startsWith(ym)).reduce((s,x)=>s+x.amount,0);
+  const mm=db.meals.filter(x=>x.date.startsWith(ym)).reduce((s,x)=>s+x.total,0);
+  const mt=mo+mm;
+  document.getElementById('monthTotal').textContent=money(mt);
+  document.getElementById('monthOutside').textContent=money(mo);
+  document.getElementById('monthCook').textContent=money(mm);
+  document.getElementById('outsideBar').style.width = mt ? (mo/mt*100)+'%' : '0%';
+  document.getElementById('cookBar').style.width     = mt ? (mm/mt*100)+'%' : '0%';
+  const days=new Set([...db.outside,...db.meals].filter(x=>x.date.startsWith(ym)).map(x=>x.date)).size;
+  document.getElementById('monthAvg').textContent = days ? `有记录的 ${days} 天，平均 ${money(mt/days)}/天` : '本月还没有记录';
+
+  renderWeek();
+}
+</script>
+</body>
+</html>
