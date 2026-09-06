@@ -244,17 +244,12 @@ const REPO='chenqi1845-web/-food-cost';
 const SCHEMA=3;
 
 async function loadFromRepo(){
-  const token=localStorage.getItem('food_cost_token');
-  if(!token) return null;
+  // 读取公开 raw 文件，无 CORS 限制
   try{
-    const r=await fetch(`https://api.github.com/repos/${REPO}/contents/food-cost-data.json`,{
-      headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
-    });
+    const r=await fetch(`https://raw.githubusercontent.com/${REPO}/main/food-cost-data.json`);
     if(!r.ok) return null;
-    const d=await r.json();
-    const content=atob(d.content);
-    localStorage.setItem(DATA_KEY,d.sha);
-    return JSON.parse(content);
+    const data=await r.json();
+    return data;
   }catch(e){return null;}
 }
 
@@ -278,6 +273,17 @@ async function saveToRepo(data){
 async function syncData(){
   const localData=JSON.parse(localStorage.getItem(KEY)||'null');
   const repoData=await loadFromRepo();
+  // 获取当前 sha（写入需要）
+  const token=localStorage.getItem('food_cost_token');
+  let currentSha=localStorage.getItem(DATA_KEY)||'';
+  if(token && !currentSha){
+    try{
+      const r=await fetch(`https://api.github.com/repos/${REPO}/contents/food-cost-data.json`,{
+        headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+      });
+      if(r.ok){const d=await r.json();currentSha=d.sha;localStorage.setItem(DATA_KEY,currentSha);}
+    }catch(e){}
+  }
   if(!repoData){
     if(localData){await saveToRepo(localData);}
     return localData||{_schema:SCHEMA,foods:[],meals:[],outside:[],reminders:[]};
