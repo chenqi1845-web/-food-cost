@@ -209,7 +209,7 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
     <div class="row"><span>☁️ 云同步</span><span id="syncInfo" class="muted"></span></div>
     <div id="syncTokenArea" style="margin-top:8px">
       <input id="gistTokenInput" type="password" placeholder="粘贴 GitHub Token" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--card)">
-      <button onclick="saveGistToken()" style="margin-top:6px;width:100%;padding:6px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">保存并同步</button>
+      <button onclick="saveTokenAndSync()" style="margin-top:6px;width:100%;padding:6px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">保存并同步</button>
       <div class="muted" style="font-size:12px;margin-top:4px">Token 仅本地存储，不会上传到任何第三方</div>
     </div>
   </div>
@@ -239,36 +239,75 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
    数据层 + 迁移 v2 → v3
    ============================================================ */
 const KEY='food_cost_v3';
-const GIST_KEY='food_cost_gist_id';
+const DATA_KEY='food_cost_data_key';
+const REPO='chenqi1845-web/-food-cost';
 const SCHEMA=3;
 
-async function loadFromGist(){
-  const gistId=localStorage.getItem(GIST_KEY);
-  if(!gistId) return null;
+async function loadFromRepo(){
+  const token=localStorage.getItem('food_cost_token');
+  if(!token) return null;
   try{
-    const r=await fetch(`https://api.github.com/gists/${gistId}`,{
-      headers:{'Authorization':'token '+localStorage.getItem('food_cost_gist_token'),
-               'Accept':'application/vnd.github.v3+json'}
+    const r=await fetch(`https://api.github.com/repos/${REPO}/contents/food-cost-data.json`,{
+      headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
     });
     if(!r.ok) return null;
     const d=await r.json();
-    const f=d.files&&d.files['food-cost-data.json'];
-    if(!f||!f.content) return null;
-    return {data:JSON.parse(f.content), updatedAt:new Date(d.updated_at)};
+    const content=atob(d.content);
+    localStorage.setItem(DATA_KEY,d.sha);
+    return JSON.parse(content);
   }catch(e){return null;}
 }
 
-async function saveGistToken(){
-  const token = document.getElementById('modalGistToken')?.value.trim()
-              || document.getElementById('gistTokenInput')?.value.trim();
+async function saveToRepo(data){
+  const token=localStorage.getItem('food_cost_token');
+  if(!token) return;
+  const sha=localStorage.getItem(DATA_KEY)||'';
+  const content=btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const payload={message:'update food-cost data',content};
+  if(sha) payload.sha=sha;
+  try{
+    const r=await fetch(`https://api.github.com/repos/${REPO}/contents/food-cost-data.json`,{
+      method:'PUT',headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const res=await r.json();
+    if(res.sha) localStorage.setItem(DATA_KEY,res.sha);
+  }catch(e){console.warn('同步失败',e);}
+}
+
+async function syncData(){
+  const localData=JSON.parse(localStorage.getItem(KEY)||'null');
+  const repoData=await loadFromRepo();
+  if(!repoData){
+    if(localData){await saveToRepo(localData);}
+    return localData||{_schema:SCHEMA,foods:[],meals:[],outside:[],reminders:[]};
+  }
+  if(!localData){
+    localStorage.setItem(KEY,JSON.stringify(repoData));
+    return repoData;
+  }
+  const maxTs=a=>a.length?a.map(x=>x.date+'|'+String(x.id||0)).sort().at(-1):'';
+  const localTs=[maxTs(localData.foods),maxTs(localData.meals),maxTs(localData.outside)].sort().at(-1);
+  const repoTs=[maxTs(repoData.foods),maxTs(repoData.meals),maxTs(repoData.outside)].sort().at(-1);
+  if(repoTs>=localTs){
+    localStorage.setItem(KEY,JSON.stringify(repoData));
+    return repoData;
+  }else{
+    await saveToRepo(localData);
+    return localData;
+  }
+}
+
+async function saveTokenAndSync(){
+  const token=(document.getElementById('modalGistToken')||{}).value?.trim()
+             ||(document.getElementById('gistTokenInput')||{}).value?.trim();
   if(!token){ toast('请先粘贴 Token'); return; }
-  localStorage.setItem('food_cost_gist_token', token);
-  localStorage.removeItem(GIST_KEY);
+  localStorage.setItem('food_cost_token',token);
   if(document.getElementById('modalGistToken')) document.getElementById('modalGistToken').value='';
   if(document.getElementById('gistTokenInput')) document.getElementById('gistTokenInput').value='';
   toast('同步中…');
   try{
-    db = await syncWithGist();
+    db=await syncData();
     db.foods.forEach(f=>{
       if(f._origQty==null) f._origQty=f.qty||1;
       if(f.unitPrice==null) f.unitPrice=f._origQty>0?f.amount/f._origQty:f.amount;
@@ -283,7 +322,7 @@ async function saveGistToken(){
     showSyncStatus();
     render();
     toast('同步完成');
-  }catch(e){ toast('同步失败：'+e.message); }
+  }catch(e){toast('同步失败');}
 }
 
 function showSyncStatus(){
@@ -292,62 +331,14 @@ function showSyncStatus(){
   const tokenArea=document.getElementById('syncTokenArea');
   if(!el) return;
   el.style.display='block';
-  const token=localStorage.getItem('food_cost_gist_token');
-  const gistId=localStorage.getItem(GIST_KEY);
+  const token=localStorage.getItem('food_cost_token');
+  const sha=localStorage.getItem(DATA_KEY);
   if(token){
-    info.textContent=gistId?'已连接 ☁️':'未连接';
-    tokenArea.style.display='none';
+    info.textContent=sha?'已连接 ☁️':'同步中…';
+    if(tokenArea) tokenArea.style.display='none';
   }else{
     info.textContent='未连接';
-    tokenArea.style.display='block';
-  }
-}
-async function saveToGist(data){
-  const token=localStorage.getItem('food_cost_gist_token');
-  if(!token) return;
-  const gistId=localStorage.getItem(GIST_KEY);
-  const payload={description:'伙食费小账本数据',public:false,
-    files:{'food-cost-data.json':{content:JSON.stringify(data)}}};
-  try{
-    if(gistId){
-      await fetch(`https://api.github.com/gists/${gistId}`,{
-        method:'PATCH',
-        headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
-        body:JSON.stringify(payload)
-      });
-    }else{
-      const r=await fetch('https://api.github.com/gists',{
-        method:'POST',
-        headers:{'Authorization':'token '+token,'Content-Type':'application/json'},
-        body:JSON.stringify(payload)
-      });
-      const res=await r.json();
-      if(res.id){localStorage.setItem(GIST_KEY,res.id);}
-    }
-  }catch(e){console.warn('Gist保存失败',e);}
-}
-
-async function syncWithGist(){
-  const gistData=await loadFromGist();
-  const localData=JSON.parse(localStorage.getItem(KEY)||'null');
-  if(!gistData){
-    if(localData) await saveToGist(localData);
-    return localData||{_schema:SCHEMA,foods:[],meals:[],outside:[],reminders:[]};
-  }
-  if(!localData){
-    localStorage.setItem(KEY,JSON.stringify(gistData.data));
-    return gistData.data;
-  }
-  // 以最新记录的 date 为准比较
-  const maxTs=a=>a.length?a.map(x=>x.date+'|'+String(x.id||0)).sort().at(-1):'';
-  const localTs=[maxTs(localData.foods),maxTs(localData.meals),maxTs(localData.outside)].sort().at(-1);
-  const gistTs=[maxTs(gistData.data.foods),maxTs(gistData.data.meals),maxTs(gistData.data.outside)].sort().at(-1);
-  if(gistTs>=localTs){
-    localStorage.setItem(KEY,JSON.stringify(gistData.data));
-    return gistData.data;
-  }else{
-    await saveToGist(localData);
-    return localData;
+    if(tokenArea) tokenArea.style.display='block';
   }
 }
 
@@ -391,7 +382,7 @@ function loadDB(){
 // 启动（异步：先同步 Gist 再渲染）
 (async()=>{
   try{
-    db = await syncWithGist();
+    db = await syncData();
     db.foods.forEach(f=>{
       if(f._origQty==null) f._origQty=f.qty||1;
       if(f.unitPrice==null) f.unitPrice=f._origQty>0?f.amount/f._origQty:f.amount;
@@ -674,7 +665,7 @@ function normalizeFoodName(raw){
 const save=async()=>{
   try{
     localStorage.setItem(KEY, JSON.stringify(db));
-    await saveToGist(db);
+    await saveToRepo(db);
     render();
   }catch(e){ toast('保存失败：'+e.message); }
 };
@@ -695,18 +686,18 @@ function toast(msg, ms=1800){
 }
 
 function showSyncModal(){
-  const token=localStorage.getItem('food_cost_gist_token');
-  const gistId=localStorage.getItem(GIST_KEY);
-  const status=gistId?'已连接 ☁️':'未连接';
+  const token=localStorage.getItem('food_cost_token');
+  const sha=localStorage.getItem(DATA_KEY);
+  const status=sha?'已连接 ☁️':'未连接';
   const area=token?`<div class="muted" style="padding:12px;background:var(--card);border-radius:8px;text-align:center">
-    <div style="font-size:24px;margin-bottom:8px">${gistId?'✅':'⚠️'}</div>
+    <div style="font-size:24px;margin-bottom:8px">${sha?'✅':'⚠️'}</div>
     <div>${status}</div>
-    ${gistId?`<div class="muted" style="margin-top:8px">设备：电脑/手机均打开此页面即可自动同步</div>`:''}
-    <button onclick="localStorage.removeItem('food_cost_gist_token');localStorage.removeItem(GIST_KEY);showSyncModal();toast('已断开')" style="margin-top:12px;padding:6px 16px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer">断开同步</button>
+    ${sha?`<div class="muted" style="margin-top:8px">设备：电脑/手机均打开此页面即可自动同步</div>`:''}
+    <button onclick="localStorage.removeItem('food_cost_token');localStorage.removeItem(DATA_KEY);showSyncModal();toast('已断开')" style="margin-top:12px;padding:6px 16px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer">断开同步</button>
   </div>`:`<div style="padding:12px">
     <div class="muted" style="margin-bottom:12px">首次使用请粘贴 GitHub Token：</div>
     <input id="modalGistToken" type="password" placeholder="ghp_xxxxxxxxxxxx" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;box-sizing:border-box;background:var(--card)">
-    <button onclick="document.getElementById('gistTokenInput').value=document.getElementById('modalGistToken').value;saveGistToken();closeModal()" style="margin-top:10px;width:100%;padding:8px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">保存并同步</button>
+    <button onclick="document.getElementById('gistTokenInput').value=document.getElementById('modalGistToken').value;saveTokenAndSync();closeModal()" style="margin-top:10px;width:100%;padding:8px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">保存并同步</button>
     <div class="muted" style="font-size:12px;margin-top:8px;text-align:center">Token 仅本地存储，不会上传至任何第三方</div>
   </div>`;
   modal(`<h3>☁️ 云同步</h3>${area}<div style="text-align:center;margin-top:12px"><button class="ghost" onclick="closeModal()">关闭</button></div>`);
