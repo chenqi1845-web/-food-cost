@@ -296,7 +296,8 @@ function loadDB(){
   return prev;
 }
 
-// 启动（异步：先同步 Gist 再渲染）
+let db;
+// 启动
 (async()=>{
   try{
     db = await syncData();
@@ -311,7 +312,7 @@ function loadDB(){
       if(!f.expiresAt){const exp=new Date(f.date+'T00:00:00');exp.setDate(exp.getDate()+f.shelfLifeDays);f.expiresAt=exp.toISOString().slice(0,10);}
       if(f.lowStockThreshold==null) f.lowStockThreshold=Math.max(1,Math.round((f._origQty||1)*0.2));
     });
-  }catch(e){console.warn('Gist同步失败，用本地数据',e);}
+  }catch(e){console.warn('加载失败，使用空白数据',e);}
   render();
   showSyncStatus();
   ensureNotifPermission();
