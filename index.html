@@ -820,11 +820,11 @@ function delOutside(id){ db.outside=db.outside.filter(x=>x.id!==id); save(); toa
    ============================================================ */
 function openRecordModal(){
   const tabs=[{id:'buy',label:'🛒 采购',icon:'buy'},{id:'outside',label:'🍜 外食',icon:'outside'},{id:'cook',label:'🥬 做饭',icon:'cook'},{id:'batch',label:'📋 批量',icon:'batch'}];
-  let active='buy';
+  window._rt={active:'buy',render:null};
   const contentId='recordTabContent';
-  function render(){
+  window._rt.render=function(){
     const c=document.getElementById(contentId);
-    if(active==='buy'){
+    if(window._rt.active==='buy'){
       c.innerHTML=`<label>日期</label><input id="bDate" type="date" value="${today()}">
         <label>食材</label><input id="bName" placeholder="例如 鸡胸肉" oninput="onBuyNameInput()">
         <div id="dupWarn"></div>
@@ -835,14 +835,14 @@ function openRecordModal(){
         <div class="storage-tabs" id="storageTabs"><button data-s="fridge" class="active">🧊 冷藏</button><button data-s="frozen">❄ 冷冻</button><button data-s="room">🌡 常温</button></div>
         <button class="primary" style="margin-top:18px" onclick="addFood()">加入库存</button>`;
       document.querySelectorAll('#storageTabs button').forEach(b=>{b.onclick=()=>{document.querySelectorAll('#storageTabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');};});setTimeout(()=>document.getElementById('bName').focus(),50);
-    }else if(active==='outside'){
+    }else if(window._rt.active==='outside'){
       c.innerHTML=`<label>日期</label><input id="oDate" type="date" value="${today()}">
         <label>类型</label><select id="oMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
         <label>金额</label><input id="oAmount" type="number" step="0.01" placeholder="例如 35">
         <label>备注</label><input id="oNote" placeholder="例如 拉面">
         <button class="primary" style="margin-top:18px" onclick="addOutside()">保存</button>`;
       setTimeout(()=>document.getElementById('oAmount').focus(),50);
-    }else if(active==='cook'){
+    }else if(window._rt.active==='cook'){
       c.innerHTML=`<label>日期</label><input id="cDate" type="date" value="${today()}">
         <label>类型</label><select id="cMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
         <div id="cookRows"></div>
@@ -850,7 +850,7 @@ function openRecordModal(){
         <button class="primary" style="margin-top:12px" onclick="saveCook()">保存本餐</button>`;
       addCookRow();
       setTimeout(()=>document.getElementById('cMeal').focus(),50);
-    }else if(active==='batch'){
+    }else if(window._rt.active==='batch'){
       c.innerHTML=`<label>多行录入（格式：食材名 金额 单位）</label>
         <textarea id="batchInput" placeholder="牛奶 10元 500ml&#10;鸡蛋 15元 12个&#10;西红柿 8元 500g" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;min-height:120px;resize:vertical"></textarea>
         <button class="primary" style="margin-top:12px" onclick="submitBatch()">识别并预览</button>
@@ -859,9 +859,9 @@ function openRecordModal(){
     }
   }
   modal(`<h3>📝 记一笔</h3>
-    <div class="record-tabs">${tabs.map(t=>`<button class="record-tab${t.id==='buy'?' active':''}" onclick="active='${t.id}';document.querySelectorAll('.record-tab').forEach(b=>b.classList.remove('active'));this.classList.add('active');render()">${t.label}</button>`).join('')}</div>
+    <div class="record-tabs">${tabs.map(t=>`<button class="record-tab${t.id==='buy'?' active':''}" onclick="window._rt.active='${t.id}';document.querySelectorAll('.record-tab').forEach(b=>b.classList.remove('active'));this.classList.add('active');window._rt.render()">${t.label}</button>`).join('')}</div>
     <div id="${contentId}"></div>`);
-  render();
+  window._rt.render();
 }
 
 function submitBatch(){
