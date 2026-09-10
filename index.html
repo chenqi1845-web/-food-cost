@@ -28,21 +28,12 @@ h2{font-size:20px;margin:18px 0 8px}
 .pill{background:rgba(255,255,255,.1);padding:8px 11px;border-radius:12px;font-size:13px}
 nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,100%);background:rgba(255,255,255,.95);backdrop-filter:blur(15px);display:flex;border-top:1px solid var(--line);padding:9px 6px calc(9px + env(safe-area-inset-bottom));z-index:5}
 /* 悬浮快捷输入栏 */
-.quick-bar{position:fixed;bottom:calc(56px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(520px,100%);background:var(--accent2);border-radius:16px 16px 0 0;padding:8px 10px 6px;display:flex;gap:6px;align-items:center;z-index:6;box-shadow:0 -2px 12px rgba(0,0,0,.08)}
-.quick-bar input{flex:1;border:1px solid var(--line);border-radius:20px;padding:8px 14px;font-size:15px;background:#fff;outline:none}
-.quick-bar input:focus{border-color:var(--accent)}
-.quick-bar button.send{background:var(--accent);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.quick-bar-sugs{display:flex;gap:4px;padding:2px 10px 4px;flex-wrap:wrap}
-.quick-sug{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:2px 10px;font-size:12px;color:var(--muted);cursor:pointer}
-.quick-sug:hover{background:var(--accent2);color:var(--accent)}
-/* 快捷录入预览弹窗 */
-.qitem{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
-.qitem:last-child{border-bottom:none}
-.qitem-name{font-weight:600}
-.qitem-parse{color:var(--muted);font-size:13px}
-.qitem-ok{color:var(--accent);font-size:20px}
-.qitem-bad{color:var(--danger);font-size:20px}
-.qitem input{min-width:60px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;text-align:right}
+.quick-bar{position:fixed;bottom:calc(56px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(520px,100%);background:var(--card);border-radius:20px 20px 0 0;padding:8px 14px;z-index:6;box-shadow:0 -2px 12px rgba(0,0,0,.08)}
+.quick-bar input{border:0;background:var(--accent2);border-radius:20px;padding:10px 16px;font-size:15px;width:100%;color:var(--muted);cursor:pointer}
+/* 统一录入弹窗 */
+.record-tabs{display:flex;gap:6px;margin:12px 0}
+.record-tab{flex:1;padding:9px 6px;background:var(--accent2);color:var(--accent);border:0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;text-align:center}
+.record-tab.active{background:var(--accent);color:#fff}
 </style>
 nav button{flex:1;border:0;background:none;color:#999;font-size:12px;padding:5px}
 nav button.active{color:var(--accent);font-weight:700}
@@ -181,29 +172,14 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
 <section id="home" class="page active">
   <div class="section-title">今天</div>
   <div id="todayList"></div>
-  <div class="section-title">快速记一笔</div>
-  <div class="actions">
-    <button class="primary" onclick="openOutside()">🍜 外食</button>
-    <button class="primary" onclick="openCook()">🥬 做饭</button>
-  </div>
   <div class="section-title">即将过期（优先消耗）</div>
   <div id="recentFood"></div>
 </section>
 
 <section id="inventory" class="page">
   <div class="row"><div><h2>食材库存</h2><div class="muted">采购金额会随着使用比例自动减少</div></div></div>
-  <button class="primary" style="margin-top:12px" onclick="openBuy()">＋ 登记买菜</button>
-  <div class="actions" style="margin-top:8px">
-    <button class="secondary" onclick="openVoiceBuy()">🎤 语音录入</button>
-    <button class="secondary" onclick="openOCRBuy()">📷 拍照/小票</button>
-    <button class="secondary" onclick="exportData()">📤 导出</button>
-    <button class="secondary" onclick="importData()">📥 导入</button>
-  </div>
-
-  <!-- 数据可视化卡片 -->
+  <button class="primary" style="margin-top:12px" onclick="openRecordModal()">＋ 记一笔</button>
   <div id="inventoryStats"></div>
-
-  <!-- 视图切换 -->
   <div class="storage-tabs" id="viewTabs" style="margin-top:16px">
     <button data-view="expire" class="active">⏳ 按过期时间</button>
     <button data-view="category">📦 按分类</button>
@@ -240,12 +216,10 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
 <button onclick="showPage('stats',this)"><b>◔</b>统计</button>
 </nav>
 
-<!-- 悬浮快捷输入栏 -->
-<div id="quickBar" class="quick-bar" style="display:none">
-  <input id="quickInput" placeholder="牛奶 10元 500ml，回车发送…" onkeydown="if(event.key==='Enter')quickSubmit()">
-  <button class="send" onclick="quickSubmit()">➤</button>
+<!-- 悬浮快捷输入栏（点输入框打开统一录入） -->
+<div id="quickBar" class="quick-bar">
+  <input id="quickInput" placeholder="点此记一笔…" onfocus="openRecordModal()" readonly style="cursor:pointer;background:var(--card)">
 </div>
-<div id="quickSugs" class="quick-bar-sugs" style="display:none"></div>
 </div>
 
 <div class="modal" id="modal"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
@@ -323,38 +297,6 @@ function loadDB(){
 /* ============================================================
    快捷悬浮输入栏
    ============================================================ */
-const QUICK_SUGS_KEY='quick_sugs_v1';
-function getQuickSugs(){try{return JSON.parse(localStorage.getItem(QUICK_SUGS_KEY)||'[]');}catch(e){return [];}}
-function saveQuickSugs(list){localStorage.setItem(QUICK_SUGS_KEY,JSON.stringify(list.slice(0,20)));}
-function addQuickSug(name){
-  name=name.trim();
-  if(!name) return;
-  const list=getQuickSugs();
-  list.unshift(name);
-  const uniq=list.filter((v,i)=>list.indexOf(v)===i);
-  saveQuickSugs(uniq);
-  renderQuickSugs();
-}
-function renderQuickSugs(){
-  const el=document.getElementById('quickSugs');
-  if(!el) return;
-  const sugs=getQuickSugs().slice(0,8);
-  if(!sugs.length){el.style.display='none';return;}
-  el.style.display='flex';
-  el.innerHTML=sugs.map(s=>`<span class="quick-sug" onclick="document.getElementById('quickInput').value='${s.replace(/'/g,"\\'")} ';document.getElementById('quickInput').focus()">${s}</span>`).join('');
-}
-function showQuickBar(){
-  const el=document.getElementById('quickBar');
-  if(el) el.style.display='flex';
-  renderQuickSugs();
-}
-function hideQuickBar(){
-  const el=document.getElementById('quickBar');
-  if(el) el.style.display='none';
-  const sugs=document.getElementById('quickSugs');
-  if(sugs) sugs.style.display='none';
-}
-
 // 自由文字智能解析（支持多种格式混合）
 // 格式示例：牛奶10元500ml、鸡蛋15元12个、西红柿8元500g
 // 也支持：买了牛奶10块500ml
@@ -494,7 +436,6 @@ let db;
   }catch(e){console.warn('加载失败，使用空白数据',e);}
   render();
   showSyncStatus();
-  showQuickBar();
   ensureNotifPermission();
   setInterval(runNotifCheck, 60000);
 })();
@@ -874,6 +815,78 @@ function saveOutsideEdit(id){
   closeModal(); save(); toast('已更新');
 }
 function delOutside(id){ db.outside=db.outside.filter(x=>x.id!==id); save(); toast('已删除'); }
+
+/* ============================================================
+   统一录入入口
+   ============================================================ */
+function openRecordModal(){
+  const tabs=[{id:'buy',label:'🛒 采购',icon:'buy'},{id:'outside',label:'🍜 外食',icon:'outside'},{id:'cook',label:'🥬 做饭',icon:'cook'},{id:'batch',label:'📋 批量',icon:'batch'}];
+  let active='buy';
+  const contentId='recordTabContent';
+  function render(){
+    const c=document.getElementById(contentId);
+    if(active==='buy'){
+      c.innerHTML=`<label>日期</label><input id="bDate" type="date" value="${today()}">
+        <label>食材</label><input id="bName" placeholder="例如 鸡胸肉" oninput="onBuyNameInput()">
+        <div id="dupWarn"></div>
+        <label>购买金额</label><input id="bAmount" type="number" step="0.01" placeholder="例如 25">
+        <label>计量方式</label><select id="bUnit"><option value="g">克（g）</option><option value="ml">毫升（ml）</option><option value="count">个</option><option value="portion">份/盒/袋</option></select>
+        <label>购买总量</label><input id="bQty" type="number" step="0.01" placeholder="例如 500">
+        <label>保存方式</label>
+        <div class="storage-tabs" id="storageTabs"><button data-s="fridge" class="active">🧊 冷藏</button><button data-s="frozen">❄ 冷冻</button><button data-s="room">🌡 常温</button></div>
+        <button class="primary" style="margin-top:18px" onclick="addFood()">加入库存</button>`;
+      document.querySelectorAll('#storageTabs button').forEach(b=>{b.onclick=()=>{document.querySelectorAll('#storageTabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');};});setTimeout(()=>document.getElementById('bName').focus(),50);
+    }else if(active==='outside'){
+      c.innerHTML=`<label>日期</label><input id="oDate" type="date" value="${today()}">
+        <label>类型</label><select id="oMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
+        <label>金额</label><input id="oAmount" type="number" step="0.01" placeholder="例如 35">
+        <label>备注</label><input id="oNote" placeholder="例如 拉面">
+        <button class="primary" style="margin-top:18px" onclick="addOutside()">保存</button>`;
+      setTimeout(()=>document.getElementById('oAmount').focus(),50);
+    }else if(active==='cook'){
+      c.innerHTML=`<label>日期</label><input id="cDate" type="date" value="${today()}">
+        <label>类型</label><select id="cMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
+        <div id="cookRows"></div>
+        <button class="ghost" style="width:100%;margin-top:8px" onclick="addCookRow()">＋ 添加食材</button>
+        <button class="primary" style="margin-top:12px" onclick="saveCook()">保存本餐</button>`;
+      addCookRow();
+      setTimeout(()=>document.getElementById('cMeal').focus(),50);
+    }else if(active==='batch'){
+      c.innerHTML=`<label>多行录入（格式：食材名 金额 单位）</label>
+        <textarea id="batchInput" placeholder="牛奶 10元 500ml&#10;鸡蛋 15元 12个&#10;西红柿 8元 500g" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;min-height:120px;resize:vertical"></textarea>
+        <button class="primary" style="margin-top:12px" onclick="submitBatch()">识别并预览</button>
+        <div id="batchPreview"></div>`;
+      setTimeout(()=>document.getElementById('batchInput').focus(),50);
+    }
+  }
+  modal(`<h3>📝 记一笔</h3>
+    <div class="record-tabs">${tabs.map(t=>`<button class="record-tab${t.id==='buy'?' active':''}" onclick="active='${t.id}';document.querySelectorAll('.record-tab').forEach(b=>b.classList.remove('active'));this.classList.add('active');render()">${t.label}</button>`).join('')}</div>
+    <div id="${contentId}"></div>`);
+  render();
+}
+
+function submitBatch(){
+  const text=document.getElementById('batchInput').value.trim();
+  if(!text){toast('请输入内容');return;}
+  const items=parseQuickText(text);
+  const ok=items.filter(x=>x.ok);
+  if(!ok.length){toast('未能识别任何食材');return;}
+  document.getElementById('batchPreview').innerHTML='<div style="margin-top:12px">'+ok.map(it=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><b>${it.name}</b><span>¥${it.amount} · ${it.qty}${it.unit}</span></div>`).join('')+'</div>';
+  document.getElementById('batchPreview').innerHTML+=`<button class="primary" style="margin-top:12px" onclick="confirmQuickItems(${JSON.stringify(ok).replace(/'/g,"\\'")})">✓ 全部加入（${ok.length}项）</button>`;
+}
+
+function addCookRow(){
+  const rows=document.getElementById('cookRows');
+  if(!rows) return;
+  const n=rows.children.length;
+  const div=document.createElement('div');
+  div.className='food';
+  div.style='display:flex;gap:6px;margin-bottom:6px';
+  div.innerHTML=`<input class="foodName" placeholder="食材名" style="flex:2">
+    <select class="useMode" style="flex:1;border:1px solid var(--line);border-radius:12px;padding:8px"><option value="qty">用量</option><option value="half">一半</option><option value="third">1/3</option><option value="quarter">1/4</option><option value="remain">剩余</option></select>
+    <input class="useQty" type="number" placeholder="数量" style="flex:1;border:1px solid var(--line);border-radius:12px;padding:8px">`;
+  rows.appendChild(div);
+}
 
 /* ============================================================
    采购（手动）
