@@ -33,8 +33,12 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,
 /* 统一录入弹窗 */
 .record-tabs{display:flex;gap:6px;margin:12px 0}
 .record-tab{flex:1;padding:9px 6px;background:var(--accent2);color:var(--accent);border:0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;text-align:center}
-|.record-tab.active{background:var(--accent);color:#fff}
-nav button{flex:1;border:0;background:none;color:#999;font-size:12px;padding:5px}
+.record-tab.active{background:var(--accent);color:#fff}
+/* 子功能按钮 */
+.buy-methods{margin-top:4px}
+.method-btns{display:flex;gap:6px;margin-bottom:12px}
+.method-btn{flex:1;padding:8px 4px;background:var(--accent2);color:var(--accent);border:0;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;text-align:center}
+.method-btn.active{background:var(--accent);color:#fff}
 nav button.active{color:var(--accent);font-weight:700}
 nav b{display:block;font-size:20px;margin-bottom:2px}
 .page{display:none;padding:12px 20px}
@@ -819,22 +823,37 @@ function delOutside(id){ db.outside=db.outside.filter(x=>x.id!==id); save(); toa
    统一录入入口
    ============================================================ */
 function openRecordModal(){
-  const tabs=[{id:'buy',label:'🛒 采购',icon:'buy'},{id:'outside',label:'🍜 外食',icon:'outside'},{id:'cook',label:'🥬 做饭',icon:'cook'},{id:'batch',label:'📋 批量',icon:'batch'}];
+  const tabs=[
+    {id:'buy',  label:'🛒 购入'},
+    {id:'outside', label:'🍜 外食'},
+    {id:'cook', label:'🥬 做饭'}
+  ];
   window._rt={active:'buy',render:null};
   const contentId='recordTabContent';
   window._rt.render=function(){
     const c=document.getElementById(contentId);
     if(window._rt.active==='buy'){
-      c.innerHTML=`<label>日期</label><input id="bDate" type="date" value="${today()}">
-        <label>食材</label><input id="bName" placeholder="例如 鸡胸肉" oninput="onBuyNameInput()">
-        <div id="dupWarn"></div>
-        <label>购买金额</label><input id="bAmount" type="number" step="0.01" placeholder="例如 25">
-        <label>计量方式</label><select id="bUnit"><option value="g">克（g）</option><option value="ml">毫升（ml）</option><option value="count">个</option><option value="portion">份/盒/袋</option></select>
-        <label>购买总量</label><input id="bQty" type="number" step="0.01" placeholder="例如 500">
-        <label>保存方式</label>
-        <div class="storage-tabs" id="storageTabs"><button data-s="fridge" class="active">🧊 冷藏</button><button data-s="frozen">❄ 冷冻</button><button data-s="room">🌡 常温</button></div>
-        <button class="primary" style="margin-top:18px" onclick="addFood()">加入库存</button>`;
-      document.querySelectorAll('#storageTabs button').forEach(b=>{b.onclick=()=>{document.querySelectorAll('#storageTabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');};});setTimeout(()=>document.getElementById('bName').focus(),50);
+      c.innerHTML=`<div class="buy-methods">
+        <div class="method-btns">
+          <button class="method-btn active" id="mBatch" onclick="switchBuyMethod('batch',this)">📝 批量录入</button>
+          <button class="method-btn" id="mVoice" onclick="switchBuyMethod('voice',this)">🎤 语音</button>
+          <button class="method-btn" id="mOCR" onclick="switchBuyMethod('ocr',this)">📷 小票</button>
+        </div>
+        <div id="buyBatchPanel">
+          <textarea id="batchInput" placeholder="牛奶 10元 500ml&#10;鸡蛋 15元 12个&#10;西红柿 8元 500g" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;min-height:120px;resize:vertical"></textarea>
+          <button class="primary" style="margin-top:12px" onclick="submitBatch()">识别并预览</button>
+          <div id="batchPreview"></div>
+        </div>
+        <div id="buyVoicePanel" style="display:none">
+          <button class="secondary" style="width:100%;margin-top:10px" onclick="startVoiceBuy()">🎤 开始语音（需在支持语音的浏览器中使用）</button>
+        </div>
+        <div id="buyOCRPanel" style="display:none">
+          <input type="file" accept="image/*" id="ocrFile" capture="environment" style="display:none" onchange="handleOCR(this)">
+          <button class="secondary" style="width:100%;margin-top:10px" onclick="document.getElementById('ocrFile').click()">📷 拍照/选择小票图片</button>
+          <div id="ocrPreview" style="margin-top:12px"></div>
+        </div>`;
+      window._rt.buyMethod='batch';
+      setTimeout(()=>document.getElementById('batchInput').focus(),50);
     }else if(window._rt.active==='outside'){
       c.innerHTML=`<label>日期</label><input id="oDate" type="date" value="${today()}">
         <label>类型</label><select id="oMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
@@ -843,25 +862,69 @@ function openRecordModal(){
         <button class="primary" style="margin-top:18px" onclick="addOutside()">保存</button>`;
       setTimeout(()=>document.getElementById('oAmount').focus(),50);
     }else if(window._rt.active==='cook'){
-      c.innerHTML=`<label>日期</label><input id="cDate" type="date" value="${today()}">
-        <label>类型</label><select id="cMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
-        <div id="cookRows"></div>
-        <button class="ghost" style="width:100%;margin-top:8px" onclick="addCookRow()">＋ 添加食材</button>
-        <button class="primary" style="margin-top:12px" onclick="saveCook()">保存本餐</button>`;
+      const usable=db.foods.filter(f=>f.remaining>0.001);
+      if(!usable.length){
+        c.innerHTML=`<div class="empty" style="padding:40px 0">还没有可用库存<br>请先去购入食材</div>`;
+        return;
+      }
+      c.innerHTML=`<div class="buy-methods">
+        <div class="method-btns">
+          <button class="method-btn active" onclick="switchCookMethod('batch',this)">📝 批量扣除</button>
+          <button class="method-btn" onclick="switchCookMethod('voice',this)">🎤 语音</button>
+        </div>
+        <div id="cookBatchPanel">
+          <label>日期</label><input id="cDate" type="date" value="${today()}">
+          <label>类型</label><select id="cMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
+          <div id="cookRows"></div>
+          <button class="ghost" style="width:100%;margin-top:8px" onclick="addCookRow()">＋ 添加食材</button>
+          <div id="cookTotal" style="font-weight:700;font-size:22px;margin:18px 0;text-align:right">本餐 ¥0.00</div>
+          <button class="primary" onclick="saveCook()">保存本餐</button>
+        </div>
+        <div id="cookVoicePanel" style="display:none">
+          <button class="secondary" style="width:100%;margin-top:10px" onclick="startVoiceCook()">🎤 开始语音</button>
+        </div>
+      </div>`;
       addCookRow();
+      window._rt.cookMethod='batch';
       setTimeout(()=>document.getElementById('cMeal').focus(),50);
-    }else if(window._rt.active==='batch'){
-      c.innerHTML=`<label>多行录入（格式：食材名 金额 单位）</label>
-        <textarea id="batchInput" placeholder="牛奶 10元 500ml&#10;鸡蛋 15元 12个&#10;西红柿 8元 500g" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;min-height:120px;resize:vertical"></textarea>
-        <button class="primary" style="margin-top:12px" onclick="submitBatch()">识别并预览</button>
-        <div id="batchPreview"></div>`;
-      setTimeout(()=>document.getElementById('batchInput').focus(),50);
     }
   }
   modal(`<h3>📝 记一笔</h3>
     <div class="record-tabs">${tabs.map(t=>`<button class="record-tab${t.id==='buy'?' active':''}" onclick="window._rt.active='${t.id}';document.querySelectorAll('.record-tab').forEach(b=>b.classList.remove('active'));this.classList.add('active');window._rt.render()">${t.label}</button>`).join('')}</div>
     <div id="${contentId}"></div>`);
   window._rt.render();
+}
+
+function switchBuyMethod(m,btn){
+  window._rt.buyMethod=m;
+  document.querySelectorAll('.method-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('buyBatchPanel').style.display=m==='batch'?'block':'none';
+  document.getElementById('buyVoicePanel').style.display=m==='voice'?'block':'none';
+  document.getElementById('buyOCRPanel').style.display=m==='ocr'?'block':'none';
+}
+
+function switchCookMethod(m,btn){
+  window._rt.cookMethod=m;
+  document.querySelectorAll('.method-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('cookBatchPanel').style.display=m==='batch'?'block':'none';
+  document.getElementById('cookVoicePanel').style.display=m==='voice'?'block':'none';
+}
+
+function startVoiceBuy(){ toast('语音功能：请在支持的浏览器中使用'); }
+function startVoiceCook(){ toast('语音功能：请在支持的浏览器中使用'); }
+
+function handleOCR(input){
+  if(!input.files[0]) return;
+  toast('OCR识别中…');
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const preview=document.getElementById('ocrPreview');
+    preview.innerHTML='<div style="text-align:center;padding:20px"><div class="muted">图片已选择，OCR功能开发中</div></div>';
+    toast('OCR功能待实现');
+  };
+  reader.readAsDataURL(input.files[0]);
 }
 
 function submitBatch(){
@@ -874,21 +937,8 @@ function submitBatch(){
   document.getElementById('batchPreview').innerHTML+=`<button class="primary" style="margin-top:12px" onclick="confirmQuickItems(${JSON.stringify(ok).replace(/'/g,"\\'")})">✓ 全部加入（${ok.length}项）</button>`;
 }
 
-function addCookRow(){
-  const rows=document.getElementById('cookRows');
-  if(!rows) return;
-  const n=rows.children.length;
-  const div=document.createElement('div');
-  div.className='food';
-  div.style='display:flex;gap:6px;margin-bottom:6px';
-  div.innerHTML=`<input class="foodName" placeholder="食材名" style="flex:2">
-    <select class="useMode" style="flex:1;border:1px solid var(--line);border-radius:12px;padding:8px"><option value="qty">用量</option><option value="half">一半</option><option value="third">1/3</option><option value="quarter">1/4</option><option value="remain">剩余</option></select>
-    <input class="useQty" type="number" placeholder="数量" style="flex:1;border:1px solid var(--line);border-radius:12px;padding:8px">`;
-  rows.appendChild(div);
-}
-
 /* ============================================================
-   采购（手动）
+   做饭
    ============================================================ */
 function openBuy(){
   modal(`<h2>登记采购</h2>
