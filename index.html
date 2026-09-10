@@ -387,7 +387,6 @@ function confirmQuickItems(items){
   closeModal();
   for(const it of items){
     addFoodQuick(it.name,it.amount,it.qty,it.unit);
-    addQuickSug(it.name);
   }
   toast(`已加入 ${items.length} 项`);
   render();
