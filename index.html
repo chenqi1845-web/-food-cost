@@ -17,19 +17,22 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC",sans-serif;color:var(--text)}
 .app{max-width:520px;margin:auto;min-height:100vh;padding-bottom:90px}
-.top{padding:28px 20px 12px}
-.date{font-size:13px;color:var(--muted)}
+.top{background:var(--accent);color:#fff;padding:20px 20px 32px;border-radius:0 0 28px 28px;margin-bottom:4px}
+.date{font-size:13px;opacity:.7}
 h1{font-size:28px;margin:5px 0 18px}
 h2{font-size:20px;margin:18px 0 8px}
+.big-num{font-size:42px;font-weight:700;letter-spacing:-1px}
+.big-num-meta{display:flex;gap:16px;margin-top:10px;font-size:13px;opacity:.8}
 .total{background:var(--text);color:#fff;border-radius:22px;padding:22px}
 .total small{opacity:.7}
 .money{font-size:38px;font-weight:700;margin-top:4px}
 .split{display:flex;gap:8px;margin-top:18px}
 .pill{background:rgba(255,255,255,.1);padding:8px 11px;border-radius:12px;font-size:13px}
-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,100%);background:rgba(255,255,255,.95);backdrop-filter:blur(15px);display:flex;border-top:1px solid var(--line);padding:9px 6px calc(9px + env(safe-area-inset-bottom));z-index:5}
-/* 悬浮快捷输入栏 */
-.quick-bar{position:fixed;bottom:calc(56px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(520px,100%);background:var(--card);border-radius:20px 20px 0 0;padding:8px 14px;z-index:6;box-shadow:0 -2px 12px rgba(0,0,0,.08)}
-.quick-bar input{border:0;background:var(--accent2);border-radius:20px;padding:10px 16px;font-size:15px;width:100%;color:var(--muted);cursor:pointer}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,100%);background:rgba(255,255,255,.97);backdrop-filter:blur(15px);display:flex;border-top:1px solid var(--line);padding:8px 0 calc(8px + env(safe-area-inset-bottom));z-index:5}
+nav button{flex:1;border:0;background:none;color:#888;font-size:11px;padding:4px 0;cursor:pointer;text-align:center}
+nav button.active{color:var(--accent);font-weight:700}
+/* FAB */
+.fab{position:fixed;bottom:calc(60px + env(safe-area-inset-bottom));right:calc(50% - 180px);width:52px;height:52px;background:var(--accent);color:#fff;border-radius:50%;border:none;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(93,116,95,.35);z-index:6;display:flex;align-items:center;justify-content:center}
 /* 统一录入弹窗 */
 .record-tabs{display:flex;gap:6px;margin:12px 0}
 .record-tab{flex:1;padding:9px 6px;background:var(--accent2);color:var(--accent);border:0;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;text-align:center}
@@ -48,6 +51,9 @@ nav b{display:block;font-size:20px;margin-bottom:2px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .muted{color:var(--muted);font-size:13px}
 .section-title{font-size:18px;font-weight:700;margin:22px 0 8px}
+.page-header{margin-bottom:8px}
+.page-header h2{margin:18px 0 4px}
+.page-header .muted{font-size:12px}
 button.primary{background:var(--accent);color:white;border:0;border-radius:14px;padding:13px 17px;font-weight:700;width:100%;font-size:15px}
 .actions{display:flex;gap:8px}
 .actions button{flex:1}
@@ -164,36 +170,27 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
 <div class="app">
 <header class="top">
   <div class="date" id="today"></div>
-  <h1>伙食费小账本</h1>
-  <div id="alertBar"></div>
-  <div class="total">
-    <small>今日伙食费</small>
-    <div class="money" id="todayTotal">¥0.00</div>
-    <div class="split"><span class="pill">外食 ¥<b id="todayOutside">0.00</b></span><span class="pill">自己做 ¥<b id="todayCook">0.00</b></span></div>
-  </div>
+  <div class="big-num" id="todayTotal">¥0.00</div>
+  <div class="big-num-meta"><span>外食 ¥<b id="todayOutside">0.00</b></span><span>自炊 ¥<b id="todayCook">0.00</b></span></div>
 </header>
 
 <section id="home" class="page active">
-  <div class="section-title">今天</div>
   <div id="todayList"></div>
-  <div class="section-title">即将过期（优先消耗）</div>
+  <div class="section-title" id="recentTitle" style="display:none">即将过期（优先消耗）</div>
   <div id="recentFood"></div>
 </section>
 
 <section id="inventory" class="page">
-  <div class="row"><div><h2>食材库存</h2><div class="muted">采购金额会随着使用比例自动减少</div></div></div>
-  <button class="primary" style="margin-top:12px" onclick="openRecordModal()">＋ 记一笔</button>
+  <div class="page-header">
+    <h2>食材库存</h2>
+    <div class="muted" style="font-size:13px">采购金额会随使用比例自动减少</div>
+  </div>
   <div id="inventoryStats"></div>
-  <div class="storage-tabs" id="viewTabs" style="margin-top:16px">
-    <button data-view="expire" class="active">⏳ 按过期时间</button>
-    <button data-view="category">📦 按分类</button>
+  <div class="storage-tabs" id="viewTabs">
+    <button data-view="expire" class="active">⏳ 按过期</button>
+    <button data-view="category">⊞ 按分类</button>
   </div>
   <div id="inventoryList"></div>
-</section>
-
-<section id="records" class="page">
-  <h2>消费记录</h2>
-  <div id="recordsList"></div>
 </section>
 
 <section id="stats" class="page">
@@ -211,20 +208,18 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
     <button class="week-arrow" onclick="shiftWeek(1)">下一周 ›</button>
   </div>
   <div class="card" id="weekCard"></div>
+  <div class="section-title" id="recordsTitle">消费记录</div>
+  <div id="recordsList"></div>
 </section>
 
 <nav>
-<button class="active" onclick="showPage('home',this)"><b>⌂</b>首页</button>
-<button onclick="showPage('inventory',this)"><b>🥬</b>库存</button>
-<button onclick="showPage('records',this)"><b>☷</b>记录</button>
-<button onclick="showPage('stats',this)"><b>◔</b>统计</button>
+<button class="active" onclick="showPage('home',this)">⌂<br><small>首页</small></button>
+<button onclick="showPage('inventory',this)">⊞<br><small>库存</small></button>
+<button onclick="showPage('stats',this)">⬡<br><small>统计</small></button>
 </nav>
 
-<!-- 悬浮快捷输入栏（点输入框打开统一录入） -->
-<div id="quickBar" class="quick-bar">
-  <input id="quickInput" placeholder="点此记一笔…" onfocus="openRecordModal()" readonly style="cursor:pointer;background:var(--card)">
-</div>
-</div>
+<!-- FAB -->
+<div class="fab" onclick="openRecordModal()">+</div>
 
 <div class="modal" id="modal"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
 <div id="toast" class="toast"></div>
@@ -378,8 +373,9 @@ function showQuickPreview(items){
       <div><div class="qitem-name" style="color:var(--danger)">❌ ${x.name||x.raw}</div>
         <div class="qitem-parse">${x.msg}</div></div>
     </div>`).join('')}
-    <button class="primary" style="margin-top:16px" onclick="confirmQuickItems(${JSON.stringify(okItems).replace(/'/g,"\\'")})">✓ 全部加入库存</button>
+    <button class="primary" style="margin-top:16px" onclick="confirmQuickItems(window._pendingItems)">✓ 全部加入库存</button>
     <button class="ghost" style="width:100%;margin-top:8px" onclick="closeModal()">取消</button>`;
+  window._pendingItems = okItems;
   modal(html);
 }
 
@@ -822,13 +818,13 @@ function delOutside(id){ db.outside=db.outside.filter(x=>x.id!==id); save(); toa
 /* ============================================================
    统一录入入口
    ============================================================ */
-function openRecordModal(){
+function openRecordModal(initialTab){
   const tabs=[
-    {id:'buy',  label:'🛒 购入'},
-    {id:'outside', label:'🍜 外食'},
-    {id:'cook', label:'🥬 做饭'}
+    {id:'buy',    label:'🛒 购入'},
+    {id:'outside',label:'🍜 外食'},
+    {id:'cook',   label:'🥬 做饭'}
   ];
-  window._rt={active:'buy',render:null};
+  window._rt={active:initialTab||'buy',render:null};
   const contentId='recordTabContent';
   window._rt.render=function(){
     const c=document.getElementById(contentId);
@@ -875,10 +871,9 @@ function openRecordModal(){
         <div id="cookBatchPanel">
           <label>日期</label><input id="cDate" type="date" value="${today()}">
           <label>类型</label><select id="cMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
-          <div id="cookRows"></div>
-          <button class="ghost" style="width:100%;margin-top:8px" onclick="addCookRow()">＋ 添加食材</button>
-          <div id="cookTotal" style="font-weight:700;font-size:22px;margin:18px 0;text-align:right">本餐 ¥0.00</div>
-          <button class="primary" onclick="saveCook()">保存本餐</button>
+          <textarea id="cookInput" placeholder="鸡胸肉 200g&#10;西红柿 2个&#10;鸡蛋 3个" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;min-height:100px;resize:vertical;margin-top:8px"></textarea>
+          <button class="secondary" style="width:100%;margin-top:10px" onclick="submitCookBatch()">识别并预览</button>
+          <div id="cookPreview"></div>
         </div>
         <div id="cookVoicePanel" style="display:none">
           <button class="secondary" style="width:100%;margin-top:10px" onclick="startVoiceCook()">🎤 开始语音</button>
@@ -890,7 +885,7 @@ function openRecordModal(){
     }
   }
   modal(`<h3>📝 记一笔</h3>
-    <div class="record-tabs">${tabs.map(t=>`<button class="record-tab${t.id==='buy'?' active':''}" onclick="window._rt.active='${t.id}';document.querySelectorAll('.record-tab').forEach(b=>b.classList.remove('active'));this.classList.add('active');window._rt.render()">${t.label}</button>`).join('')}</div>
+    <div class="record-tabs">${tabs.map(t=>`<button class="record-tab${t.id===window._rt.active?' active':''}" onclick="window._rt.active='${t.id}';document.querySelectorAll('.record-tab').forEach(b=>b.classList.remove('active'));this.classList.add('active');window._rt.render()">${t.label}</button>`).join('')}</div>
     <div id="${contentId}"></div>`);
   window._rt.render();
 }
@@ -934,7 +929,8 @@ function submitBatch(){
   const ok=items.filter(x=>x.ok);
   if(!ok.length){toast('未能识别任何食材');return;}
   document.getElementById('batchPreview').innerHTML='<div style="margin-top:12px">'+ok.map(it=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><b>${it.name}</b><span>¥${it.amount} · ${it.qty}${it.unit}</span></div>`).join('')+'</div>';
-  document.getElementById('batchPreview').innerHTML+=`<button class="primary" style="margin-top:12px" onclick="confirmQuickItems(${JSON.stringify(ok).replace(/'/g,"\\'")})">✓ 全部加入（${ok.length}项）</button>`;
+  window._pendingItems = ok;
+  document.getElementById('batchPreview').innerHTML+=`<button class="primary" style="margin-top:12px" onclick="confirmQuickItems(window._pendingItems)">✓ 全部加入（${ok.length}项）</button>`;
 }
 
 /* ============================================================
@@ -1028,41 +1024,7 @@ function addFood(){
    做饭
    ============================================================ */
 function openCook(){
-  const usable=db.foods.filter(f=>f.remaining>0.001);
-  if(!usable.length){
-    modal(`<h2>记录做饭</h2>
-      <div class="empty">还没有可用库存<br>请先去库存页登记买菜</div>
-      <button class="primary" onclick="closeModal()">知道了</button>`);
-    return;
-  }
-
-  // 检查快过期的食材，顶部提示
-  const todayStr = today();
-  const soonExpiring = usable.filter(f => {
-    const d = daysBetween(todayStr, f.expiresAt);
-    return d >= 0 && d <= 3;
-  });
-  // 按食材名去重，每名只提示一次
-  const soonByName = {};
-  for(const f of soonExpiring){
-    if(!soonByName[f.name]) soonByName[f.name] = f;
-  }
-  const soonNames = Object.values(soonByName);
-  const soonHint = soonNames.length
-    ? `<div class="dup-warn" style="margin:8px 0 12px">⏳ 冰箱里有 <b>${soonNames.length}</b> 种食材快过期了（${soonNames.slice(0,3).map(f=>f.name).join('、')}${soonNames.length>3?' 等':''}），建议优先消耗</div>`
-    : '';
-
-  modal(`<h2>记录做饭</h2>
-    ${soonHint}
-    <label>日期</label><input id="cDate" type="date" value="${today()}">
-    <label>餐次</label><select id="cMeal">
-      ${['早餐','午餐','晚餐','其他'].map(m=>`<option>${m}</option>`).join('')}
-    </select>
-    <div id="cookRows"></div>
-    <button class="secondary" style="margin-top:10px" onclick="addCookRow()">＋ 添加食材</button>
-    <div id="cookTotal" style="font-weight:700;font-size:22px;margin:18px 0">本餐 ¥0.00</div>
-    <button class="primary" onclick="saveCook()">保存本餐</button>`);
-  addCookRow();
+  openRecordModal('cook');
 }
 function addCookRow(){
   const wrap=document.getElementById('cookRows');
@@ -1168,6 +1130,62 @@ function saveCook(){
   if(!items.length){ toast('没有可保存的食材'); return; }
   db.meals.push({id:Date.now(),date,meal,total,items});
   closeModal(); save(); toast('本餐已保存');
+}
+
+function submitCookBatch(){
+  const text=document.getElementById('cookInput').value.trim();
+  if(!text){toast('请输入内容');return;}
+  // Parse with a variant that doesn't need amount
+  const lines=text.split('\n').filter(l=>l.trim());
+  const usable=db.foods.filter(f=>f.remaining>0.001);
+  const nameMap=new Map();
+  for(const f of usable){
+    if(!nameMap.has(f.name)) nameMap.set(f.name, []);
+    nameMap.get(f.name).push(f);
+  }
+  const parsed=lines.map(line=>{
+    const m=line.match(/^([^0-9￥¥\s,，]+)/);
+    if(!m) return null;
+    const name=m[1].trim();
+    const rest=line.slice(m[0].length).replace(/[0-9￥¥\s,，.]+/g,' ').trim();
+    const qty=parseFloat(rest)||1;
+    const unit=(rest.match(/[a-zA-Z一-鿿]+$/)?.[0])||'';
+    const matched=nameMap.get(name);
+    if(!matched) return {name, qty, unit, ok:false};
+    const totalQty=matched.reduce((s,f)=>s+f.remaining,0);
+    return {name, qty, unit, totalQty, ok:true, matched};
+  }).filter(Boolean);
+  const ok=parsed.filter(x=>x.ok);
+  if(!ok.length){toast('未能匹配库存食材');return;}
+  document.getElementById('cookPreview').innerHTML='<div style="margin-top:12px">'+ok.map(it=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)"><b>${it.name}</b><span>剩余 ${it.totalQty.toFixed(1)} · 扣除 ${it.qty}${it.unit}</span></div>`).join('')+'</div>';
+  document.getElementById('cookPreview').innerHTML+='<button class="primary" style="margin-top:12px" onclick="confirmCookBatch(window._cookPending)">✓ 确认扣除（${ok.length}项）</button>';
+  window._cookPending = ok;
+}
+
+function confirmCookBatch(parsed){
+  const date=document.getElementById('cDate').value;
+  const meal=document.getElementById('cMeal').value;
+  const items=[], batches=[];
+  let total=0;
+  for(const it of parsed){
+    const matched=it.matched.sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+    let need=it.qty;
+    for(const f of matched){
+      if(need<=1e-9) break;
+      const take=Math.min(f.remaining, need);
+      const up=f.unitPrice||(f._origQty>0?f.amount/f._origQty:0);
+      const cost=take*up;
+      f.qty-=take/f.qty*f.qty; // reduce proportionally
+      f.remaining-=take;
+      if(f.remaining<0.001){f.remaining=0;f.qty=0;}
+      batches.push({foodId:f.id,name:f.name,qty:take,unit:f.unit,cost});
+      total+=cost;
+      need-=take;
+    }
+  }
+  if(!batches.length){toast('没有可扣除的食材');return;}
+  db.meals.push({id:Date.now(),date,meal,total,items:batches});
+  closeModal(); save(); toast(`已扣除 ${batches.length} 项，¥${total.toFixed(2)}`);
 }
 
 function openMealEdit(id){
@@ -1848,16 +1866,8 @@ function computeReminders(foods){
 function renderAlertBar(){
   const r = computeReminders();
   const total = r.expired.length + r.expiring.length + r.lowStock.length;
-  const bar = document.getElementById('alertBar');
-  if(!total){ bar.innerHTML=''; return; }
-  const expiredNote = r.expired.length ? `${r.expired.length} 项已过期` : '';
-  const expiringNote = r.expiring.length ? `${r.expiring.length} 项即将过期` : '';
-  const lowNote = r.lowStock.length ? `${r.lowStock.length} 项库存偏低` : '';
-  const isUrgent = r.expired.length > 0;
-  bar.innerHTML = `<div class="alert-bar ${isUrgent?'urgent':''}" onclick="showAllReminders()">
-    <div><b>${isUrgent?'⚠ ':'🔔 '}</b>${[expiredNote,expiringNote,lowNote].filter(Boolean).join(' · ')}</div>
-    <button>查看</button>
-  </div>`;
+  if(!total) return;
+  // Show alert in inventory page header instead
 }
 function showAllReminders(){
   const r = computeReminders();
