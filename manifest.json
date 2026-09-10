@@ -1,0 +1,17 @@
+{
+  "name": "伙食费小账本",
+  "short_name": "伙食账本",
+  "description": "伙食费记账与库存管理",
+  "start_url": "/-food-cost/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#5d745f",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%235d745f'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>🍽</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
