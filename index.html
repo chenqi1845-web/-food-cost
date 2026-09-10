@@ -735,9 +735,15 @@ function toast(msg, ms=1800){
 }
 
 function showSyncModal(){
-  modal(`<h3>📤 数据管理</h3>
-    <p class="muted">导出 JSON 备份，需要时导入恢复</p>
-    <button class="primary" style="width:100%;margin-top:12px" onclick="exportData()">📤 导出数据</button>
+  modal(`<h3>⚙ 设置</h3>
+    <div style="background:#e8eee6;border-radius:14px;padding:16px;margin-bottom:16px">
+      <div style="font-weight:700;margin-bottom:8px">💡 iCloud 自动同步</div>
+      <div style="font-size:13px;line-height:1.6;color:#444">
+        iPhone 和 Mac 都在 <b>Safari 浏览器</b>中打开此页面，并<b>收藏到书签栏</b>（不是添加到主屏幕）。<br><br>
+        Safari 的书签会通过 iCloud 自动同步，iPhone 记的账 Mac 马上能看到。
+      </div>
+    </div>
+    <button class="primary" style="width:100%;margin-top:4px" onclick="exportData()">📤 导出数据</button>
     <button class="secondary" style="width:100%;margin-top:8px" onclick="importData()">📥 导入数据</button>
     <div style="text-align:center;margin-top:12px"><button class="ghost" onclick="closeModal()">关闭</button></div>`);
 }
