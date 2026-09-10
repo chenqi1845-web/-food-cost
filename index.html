@@ -3,10 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f7f5ef">
+<meta name="theme-color" content="#5d745f">
 <title>伙食费小账本</title>
-<meta name="version" content="20240907">
+<meta name="description" content="伙食费记账与库存管理">
+<meta name="version" content="20240910">
 <meta http-equiv="Cache-Control" content="no-cache">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%235d745f'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='white'>🍽</text></svg>">
 <style>
 :root{
   --bg:#f7f5ef; --card:#fff; --text:#242424; --muted:#888;
@@ -2297,6 +2300,11 @@ function render(){
   document.getElementById('monthAvg').textContent = days ? `有记录的 ${days} 天，平均 ${money(mt/days)}/天` : '本月还没有记录';
 
   renderWeek();
+}
+
+// Service Worker 注册（PWA 离线支持）
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
 </body>
