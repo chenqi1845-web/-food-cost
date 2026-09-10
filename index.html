@@ -175,7 +175,10 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
 <body>
 <div class="app">
 <header class="top">
-  <div class="date" id="today"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div class="date" id="today"></div>
+    <button onclick="showSyncModal()" style="background:none;border:0;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;padding:4px">⚙</button>
+  </div>
   <div class="big-num" id="todayTotal">¥0.00</div>
   <div class="big-num-meta"><span>外食 ¥<b id="todayOutside">0.00</b></span><span>自炊 ¥<b id="todayCook">0.00</b></span></div>
 </header>
