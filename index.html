@@ -27,6 +27,23 @@ h2{font-size:20px;margin:18px 0 8px}
 .split{display:flex;gap:8px;margin-top:18px}
 .pill{background:rgba(255,255,255,.1);padding:8px 11px;border-radius:12px;font-size:13px}
 nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(520px,100%);background:rgba(255,255,255,.95);backdrop-filter:blur(15px);display:flex;border-top:1px solid var(--line);padding:9px 6px calc(9px + env(safe-area-inset-bottom));z-index:5}
+/* 悬浮快捷输入栏 */
+.quick-bar{position:fixed;bottom:calc(56px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(520px,100%);background:var(--accent2);border-radius:16px 16px 0 0;padding:8px 10px 6px;display:flex;gap:6px;align-items:center;z-index:6;box-shadow:0 -2px 12px rgba(0,0,0,.08)}
+.quick-bar input{flex:1;border:1px solid var(--line);border-radius:20px;padding:8px 14px;font-size:15px;background:#fff;outline:none}
+.quick-bar input:focus{border-color:var(--accent)}
+.quick-bar button.send{background:var(--accent);color:#fff;border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.quick-bar-sugs{display:flex;gap:4px;padding:2px 10px 4px;flex-wrap:wrap}
+.quick-sug{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:2px 10px;font-size:12px;color:var(--muted);cursor:pointer}
+.quick-sug:hover{background:var(--accent2);color:var(--accent)}
+/* 快捷录入预览弹窗 */
+.qitem{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.qitem:last-child{border-bottom:none}
+.qitem-name{font-weight:600}
+.qitem-parse{color:var(--muted);font-size:13px}
+.qitem-ok{color:var(--accent);font-size:20px}
+.qitem-bad{color:var(--danger);font-size:20px}
+.qitem input{min-width:60px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;text-align:right}
+</style>
 nav button{flex:1;border:0;background:none;color:#999;font-size:12px;padding:5px}
 nav button.active{color:var(--accent);font-weight:700}
 nav b{display:block;font-size:20px;margin-bottom:2px}
@@ -222,6 +239,13 @@ label{display:block;font-size:13px;color:#777;margin:12px 0 6px}
 <button onclick="showPage('records',this)"><b>☷</b>记录</button>
 <button onclick="showPage('stats',this)"><b>◔</b>统计</button>
 </nav>
+
+<!-- 悬浮快捷输入栏 -->
+<div id="quickBar" class="quick-bar" style="display:none">
+  <input id="quickInput" placeholder="牛奶 10元 500ml，回车发送…" onkeydown="if(event.key==='Enter')quickSubmit()">
+  <button class="send" onclick="quickSubmit()">➤</button>
+</div>
+<div id="quickSugs" class="quick-bar-sugs" style="display:none"></div>
 </div>
 
 <div class="modal" id="modal"><div class="sheet"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
@@ -296,6 +320,161 @@ function loadDB(){
   return prev;
 }
 
+/* ============================================================
+   快捷悬浮输入栏
+   ============================================================ */
+const QUICK_SUGS_KEY='quick_sugs_v1';
+function getQuickSugs(){try{return JSON.parse(localStorage.getItem(QUICK_SUGS_KEY)||'[]');}catch(e){return [];}}
+function saveQuickSugs(list){localStorage.setItem(QUICK_SUGS_KEY,JSON.stringify(list.slice(0,20)));}
+function addQuickSug(name){
+  name=name.trim();
+  if(!name) return;
+  const list=getQuickSugs();
+  list.unshift(name);
+  const uniq=list.filter((v,i)=>list.indexOf(v)===i);
+  saveQuickSugs(uniq);
+  renderQuickSugs();
+}
+function renderQuickSugs(){
+  const el=document.getElementById('quickSugs');
+  if(!el) return;
+  const sugs=getQuickSugs().slice(0,8);
+  if(!sugs.length){el.style.display='none';return;}
+  el.style.display='flex';
+  el.innerHTML=sugs.map(s=>`<span class="quick-sug" onclick="document.getElementById('quickInput').value='${s.replace(/'/g,"\\'")} ';document.getElementById('quickInput').focus()">${s}</span>`).join('');
+}
+function showQuickBar(){
+  const el=document.getElementById('quickBar');
+  if(el) el.style.display='flex';
+  renderQuickSugs();
+}
+function hideQuickBar(){
+  const el=document.getElementById('quickBar');
+  if(el) el.style.display='none';
+  const sugs=document.getElementById('quickSugs');
+  if(sugs) sugs.style.display='none';
+}
+
+// 自由文字智能解析（支持多种格式混合）
+// 格式示例：牛奶10元500ml、鸡蛋15元12个、西红柿8元500g
+// 也支持：买了牛奶10块500ml
+function parseQuickText(text){
+  text=text.replace(/[，。、；：""''（）【】]/g,' ').trim();
+  // 先按换行/、分割成句
+  const lines=text.split(/[\n\/]+/).filter(l=>l.trim());
+  const results=[];
+  for(const line of lines){
+    const s=line.trim();
+    if(!s) continue;
+    // 提取食材名（金额前的文字）
+    const foodM=s.match(/^([\u4e00-\u9fa5a-zA-Z]+)/);
+    const food=foodM?foodM[1]:'';
+    if(!food){results.push({raw:s,name:'',ok:false,msg:'无法识别食材名'});continue;}
+    // 提取金额：数字+元/块/块/圆
+    const amtM=s.match(/(\d+(?:\.\d+)?)\s*(?:元|块|圆)/);
+    const amount=amtM?parseFloat(amtM[1]):0;
+    if(!amount){results.push({raw:s,name:food,ok:false,msg:'未找到金额'});continue;}
+    // 提取数量：数字+单位
+    const qtyM=s.match(/(\d+(?:\.\d+)?)\s*(ml|ML|Ml|mL|g|G|克|kg|KG|Kg|个|只|盒|袋|包|份|瓶|罐|把|根|颗|粒|升|L|l)/);
+    let qty=0,unit='portion';
+    if(qtyM){
+      qty=parseFloat(qtyM[1]);
+      const u=qtyM[2].toLowerCase();
+      if(u==='ml'||u==='l'||u==='升') unit='ml';
+      else if(u==='g'||u==='kg'||u==='克') unit='g';
+      else if(u==='个'||u==='只'||u==='盒'||u==='袋'||u==='包'||u==='瓶'||u==='罐'||u==='把'||u==='根'||u==='颗'||u==='粒') unit='count';
+      else unit='portion';
+    }else{
+      // 没有数量则默认1份
+      qty=1;unit='portion';
+    }
+    results.push({raw:s,name:food,amount,qty,unit,ok:true});
+  }
+  return results;
+}
+
+function quickSubmit(){
+  const input=document.getElementById('quickInput');
+  const text=input.value.trim();
+  if(!text) return;
+  const items=parseQuickText(text);
+  if(items.length===0){toast('未能识别内容');return;}
+  // 如果只有一条且识别成功，直接加入
+  if(items.length===1&&items[0].ok){
+    const it=items[0];
+    addFoodQuick(it.name,it.amount,it.qty,it.unit);
+    input.value='';
+    addQuickSug(it.name);
+    toast('已加入：'+it.name);
+    return;
+  }
+  // 多条或识别有疑问 → 显示预览
+  showQuickPreview(items);
+  input.value='';
+}
+
+function showQuickPreview(items){
+  const okItems=items.filter(x=>x.ok);
+  if(!okItems.length){
+    modal(`<h3>❓ 无法识别</h3>
+      <div class="muted" style="padding:12px">未能识别任何食材，请尝试格式：<br><b>牛奶 10元 500ml</b></div>
+      <button class="primary" onclick="closeModal()">知道了</button>`);
+    return;
+  }
+  const html=`<h3>📋 预览（${okItems.length}项）</h3>
+    <p class="muted" style="font-size:13px">确认后点击加入库存</p>
+    ${okItems.map((it,i)=>`<div class="qitem">
+      <div><div class="qitem-name">${it.name}</div>
+        <div class="qitem-parse">¥${it.amount} · ${it.qty}${it.unit==='ml'?'ml':it.unit==='g'?'g':'个'}</div></div>
+      <div class="qitem-ok">✓</div>
+    </div>`).join('')}
+    ${items.filter(x=>!x.ok).map(x=>`<div class="qitem">
+      <div><div class="qitem-name" style="color:var(--danger)">❌ ${x.name||x.raw}</div>
+        <div class="qitem-parse">${x.msg}</div></div>
+    </div>`).join('')}
+    <button class="primary" style="margin-top:16px" onclick="confirmQuickItems(${JSON.stringify(okItems).replace(/'/g,"\\'")})">✓ 全部加入库存</button>
+    <button class="ghost" style="width:100%;margin-top:8px" onclick="closeModal()">取消</button>`;
+  modal(html);
+}
+
+function confirmQuickItems(items){
+  closeModal();
+  for(const it of items){
+    addFoodQuick(it.name,it.amount,it.qty,it.unit);
+    addQuickSug(it.name);
+  }
+  toast(`已加入 ${items.length} 项`);
+  render();
+}
+
+function addFoodQuick(name,amount,qty,unit){
+  name=name.trim();
+  const todayStr=today();
+  const norm=normalizeFoodName(name);
+  const n=norm.canonical||name;
+  const shelf=SHELF_DB[normalize(n)]||shelfFor(n);
+  const existing=db.foods.find(f=>f.name===n&&f.date===todayStr);
+  if(existing){
+    const oldUnitPrice=existing.amount/existing._origQty;
+    existing._origQty+=qty;
+    existing.qty+=qty;
+    existing.amount+=amount;
+    existing.remaining=oldUnitPrice*existing.qty;
+    existing.unitPrice=existing.amount/existing._origQty;
+    save();return;
+  }
+  const exp=new Date(todayStr+'T00:00:00');
+  exp.setDate(exp.getDate()+(shelf?.days||7));
+  db.foods.push({
+    id:Date.now(),name:n,date:todayStr,amount:+amount,qty:+qty,_origQty:+qty,
+    unitPrice:+amount/(+qty||1),remaining:+amount,unit:unit||'portion',
+    storage:shelf?.storage||'fridge',shelfLifeDays:shelf?.days||7,
+    expiresAt:exp.toISOString().slice(0,10),lowStockThreshold:Math.max(1,Math.round((+qty||1)*0.2)),
+    batchKey:n+'|'+todayStr
+  });
+  save();
+}
+
 let db;
 // 启动
 (async()=>{
@@ -315,6 +494,7 @@ let db;
   }catch(e){console.warn('加载失败，使用空白数据',e);}
   render();
   showSyncStatus();
+  showQuickBar();
   ensureNotifPermission();
   setInterval(runNotifCheck, 60000);
 })();
