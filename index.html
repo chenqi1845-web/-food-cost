@@ -849,11 +849,33 @@ function openRecordModal(initialTab){
     if(window._rt.active==='buy'){
       c.innerHTML=`
         <div class="method-btns">
-          <button class="method-btn active" id="mBatch" onclick="switchBuyMethod('batch',this)">📝 批量</button>
+          <button class="method-btn active" id="mSingle" onclick="switchBuyMethod('single',this)">📝 单条</button>
+          <button class="method-btn" id="mBatch" onclick="switchBuyMethod('batch',this)">📋 批量</button>
           <button class="method-btn" id="mVoice" onclick="switchBuyMethod('voice',this)">🎤 语音</button>
           <button class="method-btn" id="mOCR" onclick="switchBuyMethod('ocr',this)">📷 拍照</button>
         </div>
-        <div id="buyBatchPanel">
+        <div id="buySinglePanel">
+          <label>日期</label><input id="sDate" type="date" value="${today()}">
+          <label>食材名称</label><input id="sName" placeholder="例如 鸡胸肉">
+          <div id="dupWarn2"></div>
+          <label>金额 ¥</label><input id="sAmount" type="number" step="0.01" placeholder="例如 25">
+          <label>计量</label>
+          <div style="display:flex;gap:8px">
+            <input id="sQty" type="number" step="0.01" placeholder="数量" style="flex:2">
+            <select id="sUnit" style="flex:1">
+              <option value="g">克（g）</option><option value="ml">毫升（ml）</option>
+              <option value="count" selected>个</option><option value="portion">份/盒/袋</option>
+            </select>
+          </div>
+          <label>存储</label>
+          <div class="storage-tabs" id="sStorage">
+            <button data-s="fridge" class="active">🧊 冷藏</button>
+            <button data-s="frozen">❄ 冷冻</button>
+            <button data-s="room">🌡 常温</button>
+          </div>
+          <button class="primary" style="margin-top:18px" onclick="addFoodSingle()">加入库存</button>
+        </div>
+        <div id="buyBatchPanel" style="display:none">
           <textarea id="batchInput" placeholder="牛奶 10元 500ml&#10;鸡蛋 15元 12个&#10;西红柿 8元 500g" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:15px;min-height:120px;resize:vertical"></textarea>
           <button class="primary" style="margin-top:12px" onclick="submitBatch()">识别并预览</button>
           <div id="batchPreview"></div>
@@ -866,8 +888,12 @@ function openRecordModal(initialTab){
           <button class="secondary" style="width:100%;margin-top:10px" onclick="document.getElementById('ocrFile').click()">📷 拍照/选择小票图片</button>
           <div id="ocrPreview" style="margin-top:12px"></div>
         </div>`;
-      window._rt.buyMethod='batch';
-      setTimeout(()=>document.getElementById('batchInput').focus(),50);
+      window._rt.buyMethod='single';
+      // 绑定存储按钮
+      document.querySelectorAll('#sStorage button').forEach(b=>{
+        b.onclick=()=>{ document.querySelectorAll('#sStorage button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); };
+      });
+      setTimeout(()=>document.getElementById('sName').focus(),50);
     }else if(window._rt.active==='outside'){
       c.innerHTML=`<label>日期</label><input id="oDate" type="date" value="${today()}">
         <label>餐次</label><select id="oMeal"><option>早餐</option><option>午餐</option><option>晚餐</option><option>其他</option></select>
@@ -918,9 +944,35 @@ function switchBuyMethod(m,btn){
   window._rt.buyMethod=m;
   document.querySelectorAll('.method-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  document.getElementById('buySinglePanel').style.display=m==='single'?'block':'none';
   document.getElementById('buyBatchPanel').style.display=m==='batch'?'block':'none';
   document.getElementById('buyVoicePanel').style.display=m==='voice'?'block':'none';
   document.getElementById('buyOCRPanel').style.display=m==='ocr'?'block':'none';
+}
+
+function addFoodSingle(){
+  const rawN=document.getElementById('sName').value.trim();
+  const a=+document.getElementById('sAmount').value;
+  const q=+document.getElementById('sQty').value;
+  const u=document.getElementById('sUnit').value;
+  const date=document.getElementById('sDate').value;
+  const storage=document.querySelector('#sStorage button.active')?.dataset.s||'fridge';
+  if(!rawN){ toast('请填写食材名'); return; }
+  if(!a||a<=0){ toast('请填写金额'); return; }
+  if(!q||q<=0){ toast('请填写数量'); return; }
+  const norm=normalizeFoodName(rawN);
+  const finalName=norm.canonical||rawN;
+  const unitPrice=a/q;
+  const food={
+    id:Date.now(), date, name:finalName, displayName:rawN,
+    amount:a, remaining:a, qty:q, _origQty:q, unit:u,
+    batchKey:finalName+'_'+date, storage,
+    shelfLifeDays:storage==='frozen'?90:(storage==='room'?30:7),
+    expiresAt:(d=>{const e=new Date(d+'T00:00:00');e.setDate(e.getDate()+(storage==='frozen'?90:(storage==='room'?30:7)));return e.toISOString().slice(0,10)})(date),
+    lowStockThreshold:0, unitPrice
+  };
+  db.foods.push(food);
+  closeModal(); save(); toast('已加入库存');
 }
 
 function switchCookMethod(m,btn){
